@@ -1,0 +1,9 @@
+Customer,Phone,Email,Invoice,Amount,Due
+John Carter,(312) 555-0142,john.carter@example.com,#1842,$475.00,32d
+Maria Gonzalez,312-555-0178,maria.g@example.com,#1851,$320.00,21d
+Dave Whitaker,312.555.0119,,#1857,$250.00,45d
+Priya Shah,,priya.shah@example.com,#1860,$610.00,18d
+Tom Becker,(773) 555-0163,tbecker@example.com,#1864,$385.50,27d
+Angela Brooks,773-555-0101,angela.brooks@example.com,#1866,$950.00,40d
+Luis Ortega,xxx,luis.ortega@example.com,#1871,$180.00,15d
+Kim Nguyen,(872) 555-0137,kim.nguyen@example.com,#1873,$725.00,60d
