@@ -1,0 +1,28 @@
+# The recoup block in /etc/caddy/Caddyfile. The app sets its own security headers.
+recoup.rohanahire.com {
+	encode zstd gzip
+
+	header {
+		# Remove once Recoup moves to its own domain and should be found in search.
+		X-Robots-Tag "noindex, nofollow"
+		-Server
+	}
+
+	# The scheduler is called from the server itself (recoup-cron.timer), never from outside.
+	handle /api/cron/* {
+		respond "Not found" 404
+	}
+
+	# Only the Resend webhook is public; it checks its own signature.
+	@closedHooks {
+		path /api/webhooks/*
+		not path /api/webhooks/resend
+	}
+	handle @closedHooks {
+		respond "Not found" 404
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8793
+	}
+}

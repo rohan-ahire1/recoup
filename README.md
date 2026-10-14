@@ -66,6 +66,17 @@ With no keys set, it runs in **demo mode**. Nothing is really sent, payment page
 
 Demo controls only exist in demo workspaces ("Try the demo" on the home page). They never send real email and are deleted after 3 days.
 
+## Running it on a server
+
+Files in `deploy/` describe the production setup on one Linux server behind Caddy:
+
+- `recoup.service` runs the app on 127.0.0.1:8793. Keys go in `~/.config/recoup/server.env` (see `.env.example`); data lives in `data/`.
+- `recoup-cron.timer` runs `scripts/cron.sh` every 15 minutes, which POSTs `/api/cron/run` locally with `CRON_SECRET`.
+- `recoup-backup.timer` runs `scripts/backup-db.sh` nightly: a `VACUUM INTO` copy of every database into `~/backups/recoup/<date>/`, checked and kept 14 days. To restore a business, stop the app and copy its `tenants/<id>.db` back into `data/tenants/`.
+- `Caddyfile.recoup` is the site block: `/api/cron` is closed from outside, and of the webhooks only `/api/webhooks/resend` is open.
+
+Deploy with `scripts/deploy.sh` on the server. It pulls main, installs, builds, restarts and checks `/api/health`, and goes back to the previous commit if the new one isn't healthy. Logs: `journalctl -u recoup`, `journalctl -u recoup-cron`, `journalctl -u recoup-backup`.
+
 ## Project layout
 
 ```

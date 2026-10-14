@@ -1,0 +1,32 @@
+[Unit]
+Description=Recoup
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rohan
+Group=rohan
+WorkingDirectory=/home/rohan/projects/recoup
+Environment=NODE_ENV=production
+Environment=NODE_OPTIONS=--disable-warning=ExperimentalWarning
+Environment=PORT=8793
+Environment=HOSTNAME=127.0.0.1
+Environment=PUBLIC_BASE_URL=https://recoup.rohanahire.com
+Environment=DATA_DIR=/home/rohan/projects/recoup/data
+# Secrets and keys: CRON_SECRET, TOKEN_ENCRYPTION_KEY, NTFY_URL, RESEND_*, QUICKBOOKS_*, ...
+EnvironmentFile=/home/rohan/.config/recoup/server.env
+ExecStart=/home/rohan/.local/bin/node node_modules/next/dist/bin/next start -p 8793 -H 127.0.0.1
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Recoup database backup
+
+[Service]
+Type=oneshot
+User=rohan
+Group=rohan
+EnvironmentFile=/home/rohan/.config/recoup/server.env
+Environment=DATA_DIR=/home/rohan/projects/recoup/data
+ExecStart=/home/rohan/projects/recoup/scripts/backup-db.sh
