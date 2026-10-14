@@ -21,7 +21,7 @@ export default async function WelcomePage({ searchParams }: { searchParams: Prom
     <PublicShell>
       <Panel lift className="p-6 sm:p-8">
         {error && <Notice tone="rust">Please enter your business name.</Notice>}
-        <h1 className="display text-[30px] leading-tight font-bold">Let’s set you up</h1>
+        <h1 className="display text-title font-bold">Let’s set you up</h1>
         <p className="mt-2 text-muted">This takes a minute. You can change any of it later.</p>
         <form action={createBusinessAction} className="mt-6 flex flex-col gap-4 text-sm font-semibold">
           <label>

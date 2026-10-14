@@ -23,7 +23,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
   return (
     <div className="min-h-screen px-4 pb-16 sm:px-6 lg:px-10">
       <header className="mx-auto flex max-w-6xl items-center justify-between py-5">
-        <span className="display text-[26px] font-bold text-teal">recoup</span>
+        <span className="display text-heading font-bold text-teal">recoup</span>
         <Link href="/login" className={buttonClass('ghost', 'sm')}>Sign in</Link>
       </header>
 
@@ -33,8 +33,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
 
         <section className="grid items-center gap-10 py-10 lg:grid-cols-[1.1fr_1fr] lg:py-16">
           <div>
-            <h1 className="display text-[44px] leading-[1.05] font-bold text-balance sm:text-[56px]">Get paid for the small invoices you’ve been letting go.</h1>
-            <p className="mt-5 max-w-xl text-[17px] text-muted">
+            <h1 className="display text-title leading-[1.05] font-bold text-balance sm:text-money sm:leading-[1.05]">Get paid for the small invoices you’ve been letting go.</h1>
+            <p className="mt-5 max-w-xl text-lead text-muted">
               That $300 invoice isn’t worth an agency, or an awkward phone call. Recoup sends polite, persistent reminders in your name, and stops the moment they pay.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
@@ -48,7 +48,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
 
           <Panel lift className="p-6 sm:p-7" as="div">
             <p className="text-sm text-muted">Harbor Street Bakery · 2 invoices · $1,240</p>
-            <div className="mt-4 rounded-2xl bg-linen/60 p-4 text-[15px] leading-relaxed">
+            <div className="mt-4 rounded-block bg-linen/60 p-4 text-[15px] leading-relaxed">
               Hi Dana, hope the week’s going well! A quick reminder that invoices #2041 and #2052 ($1,240 in total) are now past due. You can see them and pay here. Thanks so much!
               <span className="mt-2 block text-sm text-faint">Marco, Ferro Service Co.</span>
             </div>
@@ -69,7 +69,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
               <span className="flex h-11 w-11 items-center justify-center rounded-full bg-teal-soft text-teal">
                 <Icon name={p.icon} />
               </span>
-              <h2 className="mt-4 text-[17px] font-semibold">{p.title}</h2>
+              <h2 className="mt-4 text-base font-semibold">{p.title}</h2>
               <p className="mt-1 text-muted">{p.body}</p>
             </Panel>
           ))}
