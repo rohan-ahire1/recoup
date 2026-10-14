@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireBusiness } from '@/lib/auth';
 import { createCheckoutSession } from '@/lib/providers';
 import { stripeConfigured } from '@/lib/providers/payments';
 import { getCustomerByToken, getOpenCase, listInstallments } from '@/lib/repo';
@@ -27,6 +28,7 @@ async function collect(req: Request, customer: Customer, amountCents: number, in
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
+  await requireBusiness();
   const { token } = await params;
   const customer = getCustomerByToken(token);
   if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 });

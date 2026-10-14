@@ -5,6 +5,7 @@ import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { Chip, PageTitle, Panel, PremiumTeaser } from '@/app/components/ui';
 import { aiEnabled } from '@/lib/ai';
+import { requireBusiness } from '@/lib/auth';
 import { preview } from '@/lib/preview';
 import { listTemplateSets, type TemplateSet } from '@/lib/repo';
 import { getSettings } from '@/lib/settings';
@@ -46,7 +47,8 @@ function SetCard({ set, isDefault, businessName, senderName }: { set: TemplateSe
   );
 }
 
-export default function TemplatesPage() {
+export default async function TemplatesPage() {
+  await requireBusiness();
   const sets = listTemplateSets();
   const { defaultTemplateSet, businessName, senderName } = getSettings();
   const builtin = sets.filter((s) => s.builtin);

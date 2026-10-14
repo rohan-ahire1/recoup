@@ -2,6 +2,7 @@ import { saveSettingsAction, toggleDemoBarAction } from '@/app/actions';
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { Chip, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
 import { aiEnabled } from '@/lib/ai';
+import { requireBusiness } from '@/lib/auth';
 import { isDemoMode } from '@/lib/providers';
 import { providerStatus } from '@/lib/providers';
 import { getSettings } from '@/lib/settings';
@@ -25,6 +26,7 @@ function Connection({ name, detail, status }: { name: string; detail: string; st
 const connected = <span className="rounded-full bg-teal-soft px-3 py-1 text-sm font-semibold text-teal-strong">Connected</span>;
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
+  await requireBusiness();
   const { saved } = await searchParams;
   const s = getSettings();
   const p = providerStatus();

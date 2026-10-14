@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ColumnChart } from '@/app/components/ColumnChart';
 import { RateBars } from '@/app/components/RateBars';
 import { Avatar, PageTitle, Panel, Stat } from '@/app/components/ui';
+import { requireBusiness } from '@/lib/auth';
 import { money, plural } from '@/lib/format';
 import { allCustomerSummaries, breakdowns, overview } from '@/lib/service';
 import { getNow } from '@/lib/settings';
@@ -10,7 +11,8 @@ export const dynamic = 'force-dynamic';
 
 const AGING_COLORS = ['#f2c57c', '#e8a33d', '#c07a17', '#8a5610'];
 
-export default function ReportsPage() {
+export default async function ReportsPage() {
+  await requireBusiness();
   const now = getNow();
   const o = overview(now);
   const b = breakdowns(now);

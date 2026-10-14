@@ -4,12 +4,14 @@ import { updateCustomerAction } from '@/app/actions';
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { Avatar, Panel } from '@/app/components/ui';
+import { requireBusiness } from '@/lib/auth';
 import { formatPhone } from '@/lib/format';
 import { getCustomer } from '@/lib/repo';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EditCustomerPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireBusiness();
   const { id } = await params;
   const customer = getCustomer(Number(id));
   if (!customer) notFound();

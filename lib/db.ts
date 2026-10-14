@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync, type SQLInputValue } from 'node:sqlite';
+import { currentTenant } from './tenant';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS settings (
@@ -134,18 +135,72 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE INDEX IF NOT EXISTS events_customer ON events(customer_id);
 `;
 
-const g = globalThis as unknown as { __recoupDb2?: DatabaseSync };
+/**
+ * Schema changes go here, one entry per version, never edited once shipped.
+ * Each database records how far it got in PRAGMA user_version.
+ */
+const MIGRATIONS: string[] = [SCHEMA];
 
-export function db(): DatabaseSync {
-  if (!g.__recoupDb2) {
-    const file = path.resolve(process.env.DATABASE_PATH || path.join(process.cwd(), 'data', 'recoup-v2.db'));
-    fs.mkdirSync(path.dirname(file), { recursive: true });
-    const d = new DatabaseSync(file);
-    d.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
-    d.exec(SCHEMA);
-    g.__recoupDb2 = d;
+export function migrate(d: DatabaseSync, migrations: string[]) {
+  const current = Number((d.prepare('PRAGMA user_version').get() as { user_version: number }).user_version);
+  for (let v = current; v < migrations.length; v++) {
+    d.exec('BEGIN');
+    try {
+      d.exec(migrations[v]);
+      d.exec(`PRAGMA user_version = ${v + 1}`);
+      d.exec('COMMIT');
+    } catch (err) {
+      d.exec('ROLLBACK');
+      throw err;
+    }
   }
-  return g.__recoupDb2;
+}
+
+export function dataDir(): string {
+  return path.resolve(process.env.DATA_DIR || path.join(process.cwd(), 'data'));
+}
+
+export function openDatabase(file: string, migrations: string[]): DatabaseSync {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const d = new DatabaseSync(file);
+  d.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+  migrate(d, migrations);
+  return d;
+}
+
+export function businessDbFile(businessId: string): string {
+  return path.join(dataDir(), 'tenants', `${businessId}.db`);
+}
+
+// Open handles, one per business, most recently used last.
+const g = globalThis as unknown as { __recoupDbs?: Map<string, DatabaseSync> };
+const open = (g.__recoupDbs ??= new Map());
+const MAX_OPEN = 200;
+
+/** The current business's database. */
+export function db(): DatabaseSync {
+  const { businessId } = currentTenant();
+  let d = open.get(businessId);
+  if (d) {
+    open.delete(businessId);
+  } else {
+    d = openDatabase(businessDbFile(businessId), MIGRATIONS);
+    if (open.size >= MAX_OPEN) closeBusinessDb(open.keys().next().value!);
+  }
+  open.set(businessId, d);
+  return d;
+}
+
+export function closeBusinessDb(businessId: string) {
+  open.get(businessId)?.close();
+  open.delete(businessId);
+}
+
+/** Remove a business's data for good. */
+export function deleteBusinessDb(businessId: string) {
+  closeBusinessDb(businessId);
+  const file = businessDbFile(businessId);
+  for (const f of [file, `${file}-wal`, `${file}-shm`]) fs.rmSync(f, { force: true });
 }
 
 type Param = SQLInputValue;

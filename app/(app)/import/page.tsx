@@ -1,5 +1,6 @@
 import { ImportForm } from '@/app/components/ImportForm';
 import { PageTitle, Panel } from '@/app/components/ui';
+import { requireBusiness } from '@/lib/auth';
 import { STEPS } from '@/lib/sequence';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,8 @@ const COLUMNS: [string, string][] = [
   ['Contact, Description, Tags', 'Optional extras'],
 ];
 
-export default function ImportPage() {
+export default async function ImportPage() {
+  await requireBusiness();
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0">

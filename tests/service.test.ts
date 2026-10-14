@@ -5,7 +5,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 // Each run gets its own throwaway database.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'recoup-test-'));
-process.env.DATABASE_PATH = path.join(dir, 'test.db');
+process.env.DATA_DIR = dir;
+const { enterBusiness } = await import('../lib/tenant');
+enterBusiness({ businessId: 'test', demo: false });
 
 const svc = await import('../lib/service');
 const repo = await import('../lib/repo');

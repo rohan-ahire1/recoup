@@ -5,6 +5,7 @@ import { FilterBar } from '@/app/components/FilterBar';
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { buttonClass, Empty, ListToolbar, PageTitle, Panel } from '@/app/components/ui';
+import { requireBusiness } from '@/lib/auth';
 import { formatShortDate, money, plural } from '@/lib/format';
 import { AGE_BUCKETS } from '@/lib/service';
 import { getNow } from '@/lib/settings';
@@ -37,6 +38,7 @@ function statusText(r: InvoiceRow) {
 }
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<InvoiceQuery> }) {
+  await requireBusiness();
   const q = await searchParams;
   const rows = invoiceRows(q, getNow());
   const query = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]).toString();

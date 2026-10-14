@@ -3,6 +3,7 @@ import { DemoStrip } from '@/app/components/DemoStrip';
 import { Icon } from '@/app/components/icons';
 import { NavLinks } from '@/app/components/NavLinks';
 import { StickyBar } from '@/app/components/StickyBar';
+import { requireBusiness } from '@/lib/auth';
 import { initials } from '@/lib/format';
 import { isDemoMode } from '@/lib/providers';
 import { listMessagesByStatus } from '@/lib/repo';
@@ -10,7 +11,8 @@ import { getSettings } from '@/lib/settings';
 
 export const dynamic = 'force-dynamic';
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default async function AppLayout({ children }: { children: React.ReactNode }) {
+  await requireBusiness();
   const { businessName, showDemoBar } = getSettings();
   const toSend = listMessagesByStatus(['ready']).length;
   return (

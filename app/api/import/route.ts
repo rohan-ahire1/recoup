@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { requireBusiness } from '@/lib/auth';
 import { importCsv, previewImport } from '@/lib/service';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +8,7 @@ const MAX_BYTES = 5_000_000;
 
 /** POST { csv, dryRun? } as JSON, or a raw text/csv body with ?dryRun=1 */
 export async function POST(req: Request) {
+  await requireBusiness();
   const url = new URL(req.url);
   let csv: string;
   let dryRun = url.searchParams.get('dryRun') === '1';

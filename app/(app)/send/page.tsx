@@ -5,6 +5,7 @@ import { SendPanel } from '@/app/components/SendPanel';
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { Avatar, Empty, ListToolbar, PageTitle, Panel } from '@/app/components/ui';
 import { aiEnabled } from '@/lib/ai';
+import { requireBusiness } from '@/lib/auth';
 import { formatDateTime, money, plural } from '@/lib/format';
 import { providerStatus } from '@/lib/providers';
 import { getCustomer, listMessagesByStatus } from '@/lib/repo';
@@ -23,6 +24,7 @@ function labelOf(m: Message) {
 }
 
 export default async function SendPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  await requireBusiness();
   const { tab = 'ready' } = await searchParams;
   const { timezone } = getSettings();
   const ready = listMessagesByStatus(['ready']).reverse();

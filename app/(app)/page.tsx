@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ColumnChart } from '@/app/components/ColumnChart';
 import { Icon } from '@/app/components/icons';
 import { Avatar, ButtonLink, Empty, Panel, StatePill } from '@/app/components/ui';
+import { requireBusiness } from '@/lib/auth';
 import { CASE_LABELS, formatDateLong, formatDateTime, money, moneyShort, plural } from '@/lib/format';
 import { listInstallments, listMessagesByStatus } from '@/lib/repo';
 import { STEPS } from '@/lib/sequence';
@@ -42,7 +43,8 @@ function Metric({ label, value, sub, tone }: { label: string; value: React.React
   );
 }
 
-export default function Today() {
+export default async function Today() {
+  await requireBusiness();
   const now = getNow();
   const { timezone, senderName } = getSettings();
   const o = overview(now);

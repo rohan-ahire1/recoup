@@ -4,6 +4,7 @@ import { deleteTemplateAction, duplicateTemplateAction, updateTemplateAction } f
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { Chip, Panel } from '@/app/components/ui';
+import { requireBusiness } from '@/lib/auth';
 import { preview } from '@/lib/preview';
 import { getTemplateSet } from '@/lib/repo';
 import { STEPS, TEMPLATE_KEYS, type TemplateKey } from '@/lib/sequence';
@@ -19,6 +20,7 @@ function stepTitle(key: TemplateKey) {
 }
 
 export default async function TemplatePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }) {
+  await requireBusiness();
   const { id } = await params;
   const { saved } = await searchParams;
   const set = getTemplateSet(Number(id));

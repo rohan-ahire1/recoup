@@ -21,6 +21,7 @@ import { StoryFilter } from '@/app/components/StoryFilter';
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { Avatar, Chip, Panel, StatePill, TrackDots } from '@/app/components/ui';
 import { aiEnabled } from '@/lib/ai';
+import { requireBusiness } from '@/lib/auth';
 import { formatDateLong, formatDateTime, formatPhone, formatShortDate, money, plural } from '@/lib/format';
 import { isDemoMode, providerStatus } from '@/lib/providers';
 import { getCustomer, listCustomerInvoices, listCustomerMessages, listEvents, listInstallments, listTemplateSets } from '@/lib/repo';
@@ -135,6 +136,7 @@ function InvoiceTable({ invoices, today }: { invoices: Invoice[]; today: string 
 }
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
+  await requireBusiness();
   const { id } = await params;
   const customer = getCustomer(Number(id));
   if (!customer) notFound();

@@ -1,3 +1,4 @@
+import { requireBusiness } from '@/lib/auth';
 import { handleInboundSms } from '@/lib/service';
 import { verifyTwilioSignature } from '@/lib/providers';
 import { twilioConfigured } from '@/lib/providers/sms';
@@ -13,6 +14,7 @@ const twiml = (status = 200) =>
 
 /** Set this as the "A message comes in" webhook on your Twilio number or messaging service. */
 export async function POST(req: Request) {
+  await requireBusiness();
   const form = await req.formData();
   const params: Record<string, string> = {};
   form.forEach((v, k) => (params[k] = String(v)));
