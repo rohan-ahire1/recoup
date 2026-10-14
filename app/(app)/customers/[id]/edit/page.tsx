@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { updateCustomerAction } from '@/app/actions';
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { Avatar, Panel } from '@/app/components/ui';
+import { Avatar, FIELD, Panel } from '@/app/components/ui';
 import { requireBusiness } from '@/lib/auth';
 import { formatPhone } from '@/lib/format';
 import { getCustomer } from '@/lib/repo';
@@ -15,7 +15,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const customer = getCustomer(Number(id));
   if (!customer) notFound();
-  const field = 'mt-1 block h-11 w-full rounded-[var(--radius-control)] bg-paper px-3 font-normal ring-1 ring-line ring-inset focus:ring-teal';
+  const field = `mt-1 h-11 ${FIELD}`;
   const pill = 'flex h-10 cursor-pointer items-center rounded-full px-4 font-normal ring-1 ring-line ring-inset has-[:checked]:bg-ink has-[:checked]:text-sand has-[:checked]:ring-ink';
 
   return (
@@ -26,7 +26,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
       <Panel className="p-6 sm:p-7">
         <div className="mb-6 flex items-center gap-4">
           <Avatar name={customer.name} type={customer.type} size={52} />
-          <h1 className="display text-[28px] font-bold">Edit details</h1>
+          <h1 className="display text-title font-bold">Edit details</h1>
         </div>
         <form action={updateCustomerAction} className="grid gap-4 text-sm font-semibold sm:grid-cols-2">
           <input type="hidden" name="customerId" value={customer.id} />
@@ -66,7 +66,7 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ i
           </label>
           <div className="flex gap-2 sm:col-span-2">
             <SubmitButton variant="primary" pendingLabel="Saving…">Save details</SubmitButton>
-            <Link href={`/customers/${customer.id}`} className="ease inline-flex h-11 items-center rounded-[var(--radius-control)] px-4 text-muted hover:bg-linen hover:text-ink">Cancel</Link>
+            <Link href={`/customers/${customer.id}`} className="ease inline-flex h-11 items-center rounded-control px-4 text-muted hover:bg-linen hover:text-ink">Cancel</Link>
           </div>
         </form>
       </Panel>

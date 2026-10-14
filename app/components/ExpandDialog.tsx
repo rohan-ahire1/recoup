@@ -35,14 +35,14 @@ export function ExpandDialog({
         onClick={(e) => {
           if (e.target === ref.current) ref.current.close();
         }}
-        className={`recoup-dialog m-auto max-h-[88dvh] w-[calc(100vw-1.5rem)] overflow-hidden rounded-[24px] bg-paper p-0 text-ink shadow-[var(--shadow-lift)] ${
+        className={`recoup-dialog m-auto max-h-[88dvh] w-[calc(100vw-1.5rem)] overflow-hidden rounded-panel bg-paper ring-1 ring-edge ring-inset p-0 text-ink shadow-[var(--shadow-lift)] ${
           wide ? 'max-w-[1100px]' : 'max-w-[760px]'
         }`}
       >
         <div className="flex max-h-[88dvh] flex-col">
           <header className="flex items-start justify-between gap-4 border-b border-linen px-6 py-5 sm:px-8">
             <div className="min-w-0">
-              <h2 className="display text-[24px] leading-tight font-bold">{title}</h2>
+              <h2 className="display text-section font-bold">{title}</h2>
               {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
             </div>
             <button

@@ -12,7 +12,7 @@ import { DAY, localDate, localParts } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
 
-const AGING_COLORS = ['#f2c57c', '#e8a33d', '#c07a17', '#8a5610'];
+const AGING_COLORS = ['var(--color-aging-1)', 'var(--color-aging-2)', 'var(--color-aging-3)', 'var(--color-aging-4)'];
 
 /** Where owed money sits, in the order an owner cares about it. */
 const STATE_ORDER: { state: CustomerState; color: string; hint: string }[] = [
@@ -37,7 +37,7 @@ function Metric({ label, value, sub, tone }: { label: string; value: React.React
   return (
     <div className="flex min-w-0 flex-col gap-0.5 bg-paper px-5 py-5 sm:px-6">
       <span className="text-sm text-muted">{label}</span>
-      <span className={`display num text-[28px] leading-tight font-bold ${tone === 'teal' ? 'text-teal' : tone === 'marigold' ? 'text-marigold-ink' : ''}`}>{value}</span>
+      <span className={`display num text-heading font-bold ${tone === 'teal' ? 'text-teal' : tone === 'marigold' ? 'text-marigold-ink' : ''}`}>{value}</span>
       {sub && <span className="text-sm text-faint">{sub}</span>}
     </div>
   );
@@ -108,11 +108,11 @@ export default async function Today() {
   return (
     <div className="flex flex-col gap-6">
       <header className="max-w-3xl pb-2">
-        <h1 className="display text-[34px] leading-tight font-bold">
+        <h1 className="display text-title font-bold">
           {greeting(localParts(now, timezone).hour)}
           {senderName ? `, ${senderName}` : ''}.
         </h1>
-        <p className="mt-2 text-[19px] leading-relaxed text-pretty text-muted">
+        <p className="mt-2 text-lead leading-relaxed text-pretty text-muted">
           Customers owe you <strong className="num font-semibold text-ink">{money(o.owedCents)}</strong>.{' '}
           <strong className="num font-semibold text-teal">{money(o.recoveredThisMonth)}</strong> came back this month.{' '}
           {ready.length ? (
@@ -162,7 +162,7 @@ export default async function Today() {
       <div className="grid gap-6 lg:grid-cols-3">
         <Panel className="p-6 sm:p-7">
           <div className="mb-5">
-            <h2 className="display text-[22px] font-bold">Recovered</h2>
+            <h2 className="display text-section font-bold">Recovered</h2>
             <p className="text-sm text-muted">
               <span className="num">{moneyShort(o.recoveredAll)}</span> since you started
             </p>
@@ -172,7 +172,7 @@ export default async function Today() {
 
         <Panel className="p-6 sm:p-7">
           <div className="mb-5">
-            <h2 className="display text-[22px] font-bold">How late it is</h2>
+            <h2 className="display text-section font-bold">How late it is</h2>
             <p className="text-sm text-muted">
               <span className="num">{money(o.overdueCents)}</span> overdue
               {o.notDueCents ? (
@@ -190,7 +190,7 @@ export default async function Today() {
 
         <Panel className="p-6 sm:p-7">
           <div className="mb-5">
-            <h2 className="display text-[22px] font-bold">Where the money is</h2>
+            <h2 className="display text-section font-bold">Where the money is</h2>
             <p className="text-sm text-muted">What’s happening with each dollar owed</p>
           </div>
           {where.length === 0 ? (
@@ -224,7 +224,7 @@ export default async function Today() {
       <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,0.9fr)]">
         <Panel className="p-6 sm:p-7">
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2 className="display text-[22px] font-bold">Ready to send</h2>
+            <h2 className="display text-section font-bold">Ready to send</h2>
             {ready.length > 0 && (
               <Link href="/send" className="text-sm font-semibold text-teal hover:underline">
                 Open the send queue
@@ -240,7 +240,7 @@ export default async function Today() {
                 const label = m.step ? STEPS.find((x) => x.step === m.step)!.label : m.actionKey?.startsWith('installment') ? 'Payment plan reminder' : 'Payment plan offer';
                 return (
                   <li key={m.id}>
-                    <Link href={`/customers/${m.customerId}`} className="ease flex items-center gap-4 rounded-2xl px-3 py-3 hover:bg-linen/60">
+                    <Link href={`/customers/${m.customerId}`} className="ease flex items-center gap-4 rounded-block px-3 py-3 hover:bg-linen/60">
                       <Avatar name={s.customer.name} type={s.customer.type} size={40} />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-x-2">
@@ -263,14 +263,14 @@ export default async function Today() {
         </Panel>
 
         <Panel className="p-6 sm:p-7">
-          <h2 className="display mb-4 text-[22px] font-bold">Needs you</h2>
+          <h2 className="display mb-4 text-section font-bold">Needs you</h2>
           {needsYou.length === 0 ? (
             <p className="text-muted">No replies or disputes waiting on you.</p>
           ) : (
             <ul className="flex flex-col gap-4">
               {needsYou.map((s) => (
                 <li key={s.customer.id}>
-                  <Link href={`/customers/${s.customer.id}`} className="ease group -m-3 block rounded-2xl p-3 hover:bg-linen/60">
+                  <Link href={`/customers/${s.customer.id}`} className="ease group -m-3 block rounded-block p-3 hover:bg-linen/60">
                     <div className="flex items-center gap-3">
                       <Avatar name={s.customer.name} type={s.customer.type} size={36} />
                       <span className="font-semibold group-hover:underline">{s.customer.name}</span>
@@ -279,7 +279,7 @@ export default async function Today() {
                       </span>
                     </div>
                     <p className="mt-2 text-sm text-ink-2">{s.openCase?.attentionReason ?? 'Waiting on you'}</p>
-                    {s.lastReply && <p className="mt-2 rounded-[4px_16px_16px_16px] bg-linen px-3.5 py-2.5 text-sm text-ink-2">“{s.lastReply}”</p>}
+                    {s.lastReply && <p className="mt-2 rounded-block rounded-tl-tail bg-linen px-3.5 py-2.5 text-sm text-ink-2">“{s.lastReply}”</p>}
                   </Link>
                 </li>
               ))}
@@ -288,7 +288,7 @@ export default async function Today() {
         </Panel>
 
         <Panel className="p-6 sm:p-7 lg:col-span-2 xl:col-span-1">
-          <h2 className="display mb-4 text-[22px] font-bold">Coming up</h2>
+          <h2 className="display mb-4 text-section font-bold">Coming up</h2>
           {comingUp.length === 0 ? (
             <p className="text-muted">Nothing scheduled this week.</p>
           ) : (

@@ -9,19 +9,24 @@ Recoup should feel like a capable, warm office manager, not a debt collector and
 
 ## Color (tokens in app/globals.css)
 - sand `#F2EDE3` (ground), paper `#FFFFFF` (panels), linen `#EFE8DA` (quiet fills, chips), line `#E4DBCA`
-- ink `#23201B`, ink-2 `#3B362E`, muted `#5E574B`, faint `#7A7263` (only ≥14px, on white or sand)
+- ink `#23201B`, ink-2 `#3B362E`, muted `#5E574B`, faint `#6E6657` (passes AA on sand, paper, linen and teal-soft; not on linen-2)
+- field `#948770`: the border of anything you type into (3.5:1). Use `FIELD` from `app/components/ui.tsx`; never hand-roll a field.
+- edge `rgb(35 32 27 / 6%)`: the 1px inner ring every paper panel gets (`<Panel>` does it).
 - teal `#0F5C55` (the single action/brand accent), teal-soft `#E6F0EE`
-- marigold `#E8A33D` (attention: overdue, "to send" counts), marigold-soft `#F6D9A6`, marigold-ink `#6B4510`
+- marigold `#D4932F` (attention: overdue, "to send" counts; always with a label, never as text), marigold-soft `#F6D9A6`, marigold-ink `#6B4510`
+- aging-1…4: the light-to-dark ochre ramp for lateness charts.
 - rust `#A8321F` (errors, disputes only)
 - Primary button: ink fill with sand text. Teal marks selection and positive money (paid, recovered).
 
 ## Type
-- Display: Bricolage Grotesque 600/700, only for page titles, customer names, and headline money. Tracking -0.03em.
+- Display: Bricolage Grotesque 600/700, only for page titles, customer names, and headline money. Five sizes, each with its own tracking:
+  `text-money` 56 (-0.035em) · `text-title` 36 (-0.035em, every h1) · `text-heading` 28 (-0.025em, stats, wordmark) · `text-section` 22 (-0.02em, panel and dialog headings) · `text-lead` 19 (-0.01em, summary lines).
+- Headline money uses `<BigMoney>`: the currency sign at half size and 70% opacity, cents dropped on round amounts.
 - UI and body: Instrument Sans 400/500/600 for everything else, tabular numerals for money and dates.
-- Scale (px): 13 / 14 / 15 (body) / 17 / 22 / 30 / 52.
+- Text sizes: 12 (`text-xs`) / 13 / 14 (`text-sm`) / 15 (body) / 16 (`text-base`). Nothing else.
 
 ## Shape and depth
-- Panels radius 24px; blocks inside a panel (message previews, notices, hover rows) 16px; controls, including text fields, 14px; chips fully round.
+- Corners are tokens: `rounded-pay` 24 · `rounded-panel` 20 · `rounded-block` 14 (blocks inside a panel) · `rounded-control` 10 (buttons, fields) · `rounded-tooltip` 8 · `rounded-tail` 4 (bubble tails, chart tops) · `rounded-full` for chips, pills, dots.
 - Panels are flat on sand; the one elevated element per screen (the composer) takes `0 20px 40px -24px rgba(35,32,27,.35)`.
 
 ## Components
@@ -32,3 +37,13 @@ Recoup should feel like a capable, warm office manager, not a debt collector and
 
 ## Motion
 150–200ms ease-out on hover/press and on disclosure. No page-load choreography.
+
+## Icons
+One stroke family: 24×24, 1.5px stroke, round caps and joins, `currentColor`.
+
+## Guardrails
+`npm run check:design` (also part of `npm test` and CI) enforces this file:
+- every text/surface pairing above is checked against WCAG AA using the live values in `app/globals.css`;
+- app code may not use raw hex/rgb colours, off-scale text sizes, Tailwind's default corner sizes or raw `rounded-[…]`, `tracking-*` overrides, `ring-line` on fields, bare marigold text, faint on linen-2, paper panels without their edge, or icon strokes other than 1.5.
+
+Adding a new colour pairing? Add it to `PAIRS` in `scripts/design-check.mjs`. A line that genuinely must break a rule takes a `design-check-ignore` comment saying why.

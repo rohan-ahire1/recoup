@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { logReplyAction } from '@/app/actions';
 import { SubmitButton } from './SubmitButton';
-import { PremiumBadge } from './ui';
+import { FIELD, PremiumBadge } from './ui';
 
 const OUTCOMES = [
   { value: 'promise', label: 'Promised to pay', hint: 'Reminders wait until the date' },
@@ -27,7 +27,7 @@ export function ReplyForm({ customerId, firstName, aiEnabled, defaultChannel }: 
           required
           rows={3}
           placeholder="Paste their reply, or jot down what they said on the phone"
-          className="mt-1.5 block w-full rounded-[var(--radius-control)] bg-paper px-3 py-2 text-[15px] font-normal ring-1 ring-line ring-inset placeholder:text-faint focus:ring-teal"
+          className={`mt-1.5 py-2 text-[15px] ${FIELD}`}
         />
       </label>
       <fieldset>
@@ -44,7 +44,7 @@ export function ReplyForm({ customerId, firstName, aiEnabled, defaultChannel }: 
       <fieldset>
         <legend className="mb-1.5 text-sm font-semibold">What does it mean?</legend>
         <div className="grid gap-2">
-          <label className={`flex items-center gap-3 rounded-2xl px-3.5 py-2.5 ring-inset ${aiEnabled ? 'cursor-pointer ring-1 ring-line has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal' : 'border-[1.5px] border-dashed border-linen-2'}`}>
+          <label className={`flex items-center gap-3 rounded-block px-3.5 py-2.5 ring-inset ${aiEnabled ? 'cursor-pointer ring-1 ring-line has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal' : 'border-[1.5px] border-dashed border-linen-2'}`}>
             <input type="radio" name="kind" value="auto" disabled={!aiEnabled} checked={kind === 'auto'} onChange={() => setKind('auto')} className="accent-teal" />
             <span className="flex-1 text-sm">
               <span className="font-semibold">Let AI read it</span>
@@ -53,7 +53,7 @@ export function ReplyForm({ customerId, firstName, aiEnabled, defaultChannel }: 
             {!aiEnabled && <PremiumBadge />}
           </label>
           {OUTCOMES.map((o) => (
-            <label key={o.value} className="flex cursor-pointer items-center gap-3 rounded-2xl px-3.5 py-2.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal">
+            <label key={o.value} className="flex cursor-pointer items-center gap-3 rounded-block px-3.5 py-2.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal">
               <input type="radio" name="kind" value={o.value} checked={kind === o.value} onChange={() => setKind(o.value)} className="accent-teal" />
               <span className="text-sm">
                 <span className="font-semibold">{o.label}</span>
@@ -66,7 +66,7 @@ export function ReplyForm({ customerId, firstName, aiEnabled, defaultChannel }: 
       {kind === 'promise' && (
         <label className="text-sm font-semibold">
           Pay by
-          <input type="date" name="promiseDate" defaultValue={defaultDate} required className="num mt-1.5 block h-11 rounded-[var(--radius-control)] bg-paper px-3 font-normal ring-1 ring-line ring-inset focus:ring-teal" />
+          <input type="date" name="promiseDate" defaultValue={defaultDate} required className="num mt-1.5 block h-11 rounded-control bg-paper px-3 font-normal ring-1 ring-field ring-inset focus:ring-teal" />
         </label>
       )}
       <SubmitButton variant="primary" pendingLabel="Saving…">

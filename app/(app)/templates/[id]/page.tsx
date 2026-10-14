@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { deleteTemplateAction, duplicateTemplateAction, updateTemplateAction } from '@/app/actions';
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { Chip, Panel } from '@/app/components/ui';
+import { Chip, FIELD, Panel } from '@/app/components/ui';
 import { requireBusiness } from '@/lib/auth';
 import { preview } from '@/lib/preview';
 import { getTemplateSet } from '@/lib/repo';
@@ -26,7 +26,7 @@ export default async function TemplatePage({ params, searchParams }: { params: P
   const set = getTemplateSet(Number(id));
   if (!set) notFound();
   const { businessName, senderName } = getSettings();
-  const field = 'mt-1 block w-full rounded-[var(--radius-control)] bg-paper px-3 font-normal ring-1 ring-line ring-inset focus:ring-teal';
+  const field = `mt-1 ${FIELD}`;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -38,7 +38,7 @@ export default async function TemplatePage({ params, searchParams }: { params: P
         <>
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h1 className="display text-[30px] font-bold">{set.name}</h1>
+              <h1 className="display text-title font-bold">{set.name}</h1>
               <p className="text-muted">{set.description}</p>
             </div>
             <form action={duplicateTemplateAction}>
@@ -53,14 +53,14 @@ export default async function TemplatePage({ params, searchParams }: { params: P
                 <div className="grid gap-4 md:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
                   <div>
                     <Chip>Email</Chip>
-                    <div className="mt-2 rounded-[4px_16px_16px_16px] bg-linen/60 px-4 py-3 text-sm leading-relaxed">
+                    <div className="mt-2 rounded-block rounded-tl-tail bg-linen/60 px-4 py-3 text-sm leading-relaxed">
                       <div className="mb-1 font-semibold">{preview(set.templates[key].subject, businessName, senderName)}</div>
                       <p className="whitespace-pre-wrap text-ink-2">{preview(set.templates[key].email, businessName, senderName)}</p>
                     </div>
                   </div>
                   <div>
                     <Chip>Text</Chip>
-                    <p className="mt-2 rounded-[16px_16px_4px_16px] bg-teal-soft px-4 py-3 text-sm leading-relaxed text-ink-2">{preview(set.templates[key].sms, businessName, senderName)}</p>
+                    <p className="mt-2 rounded-block rounded-br-tail bg-teal-soft px-4 py-3 text-sm leading-relaxed text-ink-2">{preview(set.templates[key].sms, businessName, senderName)}</p>
                   </div>
                 </div>
               </Panel>
@@ -72,7 +72,7 @@ export default async function TemplatePage({ params, searchParams }: { params: P
           <input type="hidden" name="id" value={set.id} />
           <Panel className="flex flex-col gap-3 p-6 text-sm font-semibold">
             <div className="flex items-center justify-between">
-              <h1 className="display text-[26px] font-bold">Edit template</h1>
+              <h1 className="display text-title font-bold">Edit template</h1>
               {saved && <span className="text-sm font-semibold text-teal">Saved</span>}
             </div>
             <label>Name<input name="name" defaultValue={set.name} required className={`${field} h-11`} /></label>
@@ -80,7 +80,7 @@ export default async function TemplatePage({ params, searchParams }: { params: P
             <p className="font-normal text-muted">
               Placeholders fill in automatically:{' '}
               {TEMPLATE_VARIABLES.map((v) => (
-                <code key={v} className="mr-1 inline-block rounded bg-linen px-1.5 py-0.5 text-xs text-ink-2">{`{${v}}`}</code>
+                <code key={v} className="mr-1 inline-block rounded-tail bg-linen px-1.5 py-0.5 text-xs text-ink-2">{`{${v}}`}</code>
               ))}
             </p>
           </Panel>
@@ -95,7 +95,7 @@ export default async function TemplatePage({ params, searchParams }: { params: P
               </label>
             </Panel>
           ))}
-          <div className="sticky bottom-4 flex flex-wrap justify-between gap-2 rounded-[var(--radius-panel)] bg-paper/95 p-3 shadow-[var(--shadow-lift)] backdrop-blur">
+          <div className="sticky bottom-4 flex flex-wrap justify-between gap-2 rounded-panel bg-paper/95 p-3 ring-1 ring-edge ring-inset shadow-[var(--shadow-lift)] backdrop-blur">
             <SubmitButton variant="primary" pendingLabel="Saving…">Save template</SubmitButton>
           </div>
         </form>

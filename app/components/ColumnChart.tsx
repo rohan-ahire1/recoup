@@ -28,7 +28,7 @@ function niceMax(v: number): number {
  */
 export function ColumnChart({
   data,
-  color = '#0f5c55',
+  color = 'var(--color-teal)',
   height = 168,
   highlightLast = false,
   label,
@@ -76,7 +76,7 @@ export function ColumnChart({
                   aria-label={`${d.label}: ${d.display}`}
                 >
                   <span
-                    className="ease block w-full max-w-6 rounded-t-[4px] group-focus-visible:ring-2 group-focus-visible:ring-teal group-focus-visible:ring-offset-2"
+                    className="ease block w-full max-w-6 rounded-t-tail group-focus-visible:ring-2 group-focus-visible:ring-teal group-focus-visible:ring-offset-2"
                     style={{
                       height: h,
                       background: d.color ?? color,
@@ -85,7 +85,7 @@ export function ColumnChart({
                   />
                   {isActive && (
                     <span
-                      className="num pointer-events-none absolute z-10 -translate-y-2 rounded-lg bg-ink px-2 py-1 text-xs font-semibold whitespace-nowrap text-sand shadow-md"
+                      className="num pointer-events-none absolute z-10 -translate-y-2 rounded-tooltip bg-ink px-2 py-1 text-xs font-semibold whitespace-nowrap text-sand shadow-md"
                       style={{ bottom: h }}
                     >
                       {d.display}
