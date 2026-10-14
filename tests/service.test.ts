@@ -68,7 +68,7 @@ describe('prepared-mode sequence', () => {
   });
 
   it('closes the case once its invoices are paid, even with a newer invoice not yet due', async () => {
-    svc.recordPayment({ customerId: harbor, amountCents: 78000, source: 'online', now: day(8) });
+    svc.recordPayment({ customerId: harbor, amountCents: 78000, source: 'manual', now: day(8) });
     await svc.runDueActions(day(9));
     const s = svc.summarizeCustomer(repo.getCustomer(harbor)!, day(9));
     expect(s.openCase).toBeUndefined();
@@ -95,5 +95,22 @@ describe('prepared-mode sequence', () => {
   it('counts recovered money only from chased invoices', () => {
     const o = svc.overview(day(11));
     expect(o.recoveredAll).toBe(78000);
+  });
+});
+
+describe('payment page', () => {
+  it('flags "I’ve sent payment" for the business to check, once', () => {
+    svc.reportPaymentSent(mika, day(10));
+    svc.reportPaymentSent(mika, day(10));
+    const s = svc.summarizeCustomer(repo.getCustomer(mika)!, day(10));
+    expect(s.openCase?.status).toBe('needs_you');
+    expect(s.openCase?.attentionReason).toMatch(/sent payment/);
+    expect(s.ready).toBeUndefined();
+    expect(repo.listEvents(mika).filter((e) => e.type === 'claims_paid')).toHaveLength(1);
+  });
+
+  it('a recorded payment closes it', () => {
+    svc.recordPayment({ customerId: mika, amountCents: 24000, source: 'manual', now: day(11) });
+    expect(svc.summarizeCustomer(repo.getCustomer(mika)!, day(11)).openCase).toBeUndefined();
   });
 });

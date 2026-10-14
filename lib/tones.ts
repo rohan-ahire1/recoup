@@ -30,13 +30,13 @@ export const BUILTIN_TONES: BuiltinTone[] = [
       },
       '2': {
         subject: 'Following up on {invoices}',
-        email: `Hi {first_name},\n\nJust following up on {invoices_detail}. You can pay online in about a minute here:\n{pay_link}\n\nIf something's holding it up, reply to this email and we'll figure it out together.\n\nThanks,\n{signoff}`,
-        sms: `Hi {first_name}, {sender_name} at {business_name} following up on {invoices} ({total}). You can pay online here: {pay_link} ${STOP}`,
+        email: `Hi {first_name},\n\nJust following up on {invoices_detail}. Here's what's due and how to pay:\n{pay_link}\n\nIf something's holding it up, reply to this email and we'll figure it out together.\n\nThanks,\n{signoff}`,
+        sms: `Hi {first_name}, {sender_name} at {business_name} following up on {invoices} ({total}). See how to pay: {pay_link} ${STOP}`,
       },
       '3': {
-        subject: 'Pay {invoices} online',
-        email: `Hi {first_name},\n\nA quick nudge on {invoices_detail}. Here's the link to pay online. It takes about a minute:\n{pay_link}\n\nThanks as always,\n{signoff}`,
-        sms: `Hi {first_name}, a quick nudge on {invoices} ({total}) from {business_name}. Pay here in about a minute: {pay_link} ${STOP}`,
+        subject: 'How to pay {invoices}',
+        email: `Hi {first_name},\n\nA quick nudge on {invoices_detail}. Everything you need to pay is here:\n{pay_link}\n\nThanks as always,\n{signoff}`,
+        sms: `Hi {first_name}, a quick nudge on {invoices} ({total}) from {business_name}. How to pay: {pay_link} ${STOP}`,
       },
       '4': {
         subject: 'An easier way to pay {invoices}',
@@ -46,7 +46,7 @@ export const BUILTIN_TONES: BuiltinTone[] = [
       installment: {
         subject: 'Your next payment for {invoices}',
         email: `Hi {first_name},\n\nA reminder that your next payment of {installment_amount} is due {installment_due_date}. You can pay here:\n{pay_link}\n\nThanks for keeping on track!\n{signoff}`,
-        sms: `Hi {first_name}, reminder from {business_name}: your next payment of {installment_amount} is due {installment_due_date}. Pay here: {pay_link} ${STOP}`,
+        sms: `Hi {first_name}, reminder from {business_name}: your next payment of {installment_amount} is due {installment_due_date}. How to pay: {pay_link} ${STOP}`,
       },
     },
   },
@@ -62,8 +62,8 @@ export const BUILTIN_TONES: BuiltinTone[] = [
       },
       '2': {
         subject: 'Second reminder: {invoices}',
-        email: `Dear {first_name},\n\nWe have not yet received payment for {invoices_detail}. For your convenience, you can pay securely online:\n{pay_link}\n\nPlease let us know if there is anything we can clarify.\n\nKind regards,\n{signoff}`,
-        sms: `Hello {first_name}, {business_name} here. Payment for {invoices} ({total}) is still outstanding. Pay securely online: {pay_link} ${STOP}`,
+        email: `Dear {first_name},\n\nWe have not yet received payment for {invoices_detail}. For your convenience, the balance and payment details are here:\n{pay_link}\n\nPlease let us know if there is anything we can clarify.\n\nKind regards,\n{signoff}`,
+        sms: `Hello {first_name}, {business_name} here. Payment for {invoices} ({total}) is still outstanding. Payment details: {pay_link} ${STOP}`,
       },
       '3': {
         subject: 'Action needed: {invoices}',
@@ -93,14 +93,14 @@ export const BUILTIN_TONES: BuiltinTone[] = [
         sms: `{business_name}: {invoices} ({total}) past due. Questions? Reply here. ${STOP}`,
       },
       '2': {
-        subject: 'Pay {invoices} online',
-        email: `Hi {first_name},\n\nYou can pay {invoices} ({total}) here: {pay_link}\n\n{signoff}`,
-        sms: `{business_name}: pay {invoices} ({total}) here: {pay_link} ${STOP}`,
+        subject: 'How to pay {invoices}',
+        email: `Hi {first_name},\n\nHere's how to pay {invoices} ({total}): {pay_link}\n\n{signoff}`,
+        sms: `{business_name}: how to pay {invoices} ({total}): {pay_link} ${STOP}`,
       },
       '3': {
         subject: 'Reminder: {total} still open',
         email: `Hi {first_name},\n\n{total} is still open on {invoices}. Pay here: {pay_link}\n\n{signoff}`,
-        sms: `{business_name}: {total} still open on {invoices}. Pay: {pay_link} ${STOP}`,
+        sms: `{business_name}: {total} still open on {invoices}. How to pay: {pay_link} ${STOP}`,
       },
       '4': {
         subject: 'Split {total} into payments',

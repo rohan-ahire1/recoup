@@ -134,7 +134,7 @@ const pay = (): Scenario['act'] => (customerId, t) => {
     "SELECT SUM(amount_cents - amount_paid_cents) AS s FROM invoices WHERE case_id = ? AND status IN ('open', 'disputed')",
     c.id,
   )[0].s;
-  recordPayment({ customerId, amountCents: owed, source: 'online', method: 'card', now: t });
+  recordPayment({ customerId, amountCents: owed, source: 'manual', method: 'zelle', now: t });
 };
 
 const SCENARIOS: Scenario[] = [
@@ -145,8 +145,8 @@ const SCENARIOS: Scenario[] = [
   { daysAgo: 97, customer: 'Hotel Marlowe', act: pay() },
   { daysAgo: 57, customer: 'Blue Door Café', act: pay() },
   // Recently.
-  { daysAgo: 20, customer: 'Summit Dental', act: (id, t) => { choosePlan(id, 3, t); const first = listInstallments(getOpenCase(id)!.id)[0]; recordPayment({ customerId: id, amountCents: first.amountCents, installmentId: first.id, source: 'online', method: 'card', now: t }); } },
-  { daysAgo: 6, customer: 'Summit Dental', act: (id, t) => { const next = listInstallments(getOpenCase(id)!.id).find((i) => !i.paidAt)!; recordPayment({ customerId: id, amountCents: next.amountCents, installmentId: next.id, source: 'online', method: 'card', now: t }); } },
+  { daysAgo: 20, customer: 'Summit Dental', act: (id, t) => { choosePlan(id, 3, t); const first = listInstallments(getOpenCase(id)!.id)[0]; recordPayment({ customerId: id, amountCents: first.amountCents, installmentId: first.id, source: 'manual', method: 'zelle', now: t }); } },
+  { daysAgo: 6, customer: 'Summit Dental', act: (id, t) => { const next = listInstallments(getOpenCase(id)!.id).find((i) => !i.paidAt)!; recordPayment({ customerId: id, amountCents: next.amountCents, installmentId: next.id, source: 'manual', method: 'zelle', now: t }); } },
   { daysAgo: 5, customer: 'Lantern Coffee Roasters', act: pay() },
   { daysAgo: 5, customer: 'Northside Gym', act: reply('dispute', 'The second visit didn’t fix the grinder. We’re not paying for that visit until it actually works.') },
   { daysAgo: 4, customer: 'Blue Door Café', act: pay() },
@@ -216,7 +216,10 @@ export async function seedDemo() {
     run("DELETE FROM template_sets WHERE builtin = 0");
     run("DELETE FROM settings WHERE key IN ('clockOffsetMs', 'savedViews')");
   });
-  saveSettings({ businessName: 'Ferro Service Co.', senderName: 'Marco', timezone: TZ, deliveryMode: 'prepare', defaultTemplateSet: 'auto' });
+  saveSettings({ businessName: 'Ferro Service Co.', senderName: 'Marco', timezone: TZ, deliveryMode: 'prepare', defaultTemplateSet: 'auto',
+    payInstructions: 'Zelle: billing@ferroservice.com\nChecks payable to Ferro Service Co., 418 Oak St, Springfield, IL 62701\nPlease put your invoice number in the memo.',
+    payLink: '',
+  });
 
   const end = demoNow();
   const start = end - REPLAY_DAYS * DAY;

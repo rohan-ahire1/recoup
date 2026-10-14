@@ -7,6 +7,10 @@ export interface Settings {
   senderName: string;
   timezone: string;
   replyToEmail: string;
+  /** Shown on the payment page: how customers pay (bank transfer, check, Zelle…). */
+  payInstructions: string;
+  /** Optional link to the business's own payment page (Square, PayPal, QuickBooks…). */
+  payLink: string;
   /** 'prepare': drafts wait in "To send". 'auto': send through a connected provider. */
   deliveryMode: DeliveryMode;
   /** A template set id, or 'auto' to pick a tone from each customer's history. */
@@ -24,6 +28,8 @@ const DEFAULTS: Settings = {
   senderName: 'Marco',
   timezone: DEFAULT_TIMEZONE,
   replyToEmail: '',
+  payInstructions: '',
+  payLink: '',
   deliveryMode: 'prepare',
   defaultTemplateSet: 'auto',
   savedViews: [],
@@ -44,6 +50,18 @@ export function setSetting(key: string, value: unknown) {
     key,
     JSON.stringify(value),
   );
+}
+
+/** An http(s) link, or '' if it isn't one. */
+export function cleanPayLink(raw: string): string {
+  const v = raw.trim();
+  if (!v) return '';
+  try {
+    const u = new URL(/^https?:\/\//i.test(v) ? v : `https://${v}`);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : '';
+  } catch {
+    return '';
+  }
 }
 
 export function saveSettings(partial: Partial<Settings>) {

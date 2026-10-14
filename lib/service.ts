@@ -5,9 +5,8 @@ import { parseInvoiceCsv, type ParsedRow } from './csv';
 import { all, get, run, tx } from './db';
 import { formatDateLong, money, plural } from './format';
 import { suggestedTone, summarize, trackRecord, type TrackRecord } from './history';
-import { sendEmail, sendSms, type SendResult } from './providers';
+import { sendEmail, type SendResult } from './providers';
 import { resendConfigured } from './providers/email';
-import { twilioConfigured } from './providers/sms';
 import {
   builtinSet,
   findCustomer,
@@ -40,7 +39,6 @@ import {
   STEPS,
   allocatePayment,
   availableChannels,
-  carrierKeyword,
   pickChannel,
   planActions,
   splitInstallments,
@@ -201,10 +199,10 @@ export interface RunResult {
   failed: number;
 }
 
-/** Whether this business can really send on a channel. Demo workspaces never can. */
+/** Whether this business can really send on a channel. Texts are always prepared for the business's own phone; demo workspaces never send. */
 function providerFor(channel: Channel): boolean {
   if (currentTenant().demo) return false;
-  return channel === 'email' ? resendConfigured() : twilioConfigured();
+  return channel === 'email' && resendConfigured();
 }
 
 function autoSends(channel: Channel, settings: Settings): boolean {
@@ -212,7 +210,7 @@ function autoSends(channel: Channel, settings: Settings): boolean {
 }
 
 async function deliver(message: { channel: Channel; toAddr: string | null; subject: string | null; body: string }, settings: Settings): Promise<SendResult> {
-  if (message.channel === 'sms') return sendSms(message.toAddr!, message.body);
+  if (message.channel === 'sms') throw new Error('Texts are sent from the business’s own phone');
   return sendEmail({
     to: message.toAddr!,
     subject: message.subject ?? `Message from ${settings.businessName}`,
@@ -567,19 +565,6 @@ async function applyReply(customer: Customer, c: Case | undefined, kind: ReplyKi
   }
 }
 
-export async function handleInboundSms(fromPhone: string, body: string, now = getNow()) {
-  const customer = findCustomer({ phone: fromPhone });
-  if (!customer) return { matched: false };
-  const keyword = carrierKeyword(body);
-  if (keyword === 'start') {
-    updateCustomer(customer.id, { opted_out_sms: 0 });
-    logEvent(customer.id, getOpenCase(customer.id)?.id ?? null, 'opted_in', 'Texted START. Texts allowed again.', now);
-    return { matched: true };
-  }
-  await logReply({ customerId: customer.id, channel: 'sms', body, kind: keyword === 'stop' ? 'stop' : 'auto' }, now);
-  return { matched: true };
-}
-
 // =================================================================== payments & plans
 
 export function recordPayment(opts: {
@@ -620,7 +605,7 @@ export function recordPayment(opts: {
     }
     if (opts.installmentId) run('UPDATE installments SET paid_at = ? WHERE id = ?', now, opts.installmentId);
 
-    const via: Record<string, string> = { stripe: 'online', mock: 'online (test mode)', manual: 'recorded by you', demo: 'simulated' };
+    const via: Record<string, string> = { manual: 'recorded by you', demo: 'simulated' };
     const stillOverdue = c ? caseInvoices(customer.id, c.id).reduce((s, i) => s + owed(i), 0) : 0;
     logEvent(customer.id, c?.id ?? null, 'payment', `Paid ${money(opts.amountCents)} ${via[opts.source] ?? opts.source}${stillOverdue ? `. ${money(stillOverdue)} still overdue.` : '. All caught up.'}`, now);
     if (c && stillOverdue === 0) {
@@ -640,6 +625,20 @@ export function payableInvoices(customer: Customer): Invoice[] {
 
 export function payableCents(customer: Customer): number {
   return payableInvoices(customer).reduce((s, i) => s + owed(i), 0);
+}
+
+/** The customer pressed "I've sent payment" on their payment page. Flags it for the business to check. */
+export function reportPaymentSent(customerId: number, now = getNow()) {
+  const c = getOpenCase(customerId);
+  if (!c || (c.needsAttention && c.attentionReason?.startsWith('Says they'))) return;
+  if (c.status === 'plan') {
+    updateCase(c.id, { needs_attention: 1, attention_reason: 'Says they sent a plan payment. Check, then record it.' }, now);
+  } else {
+    const draft = readyMessageForCase(c.id);
+    if (draft) updateMessage(draft.id, { status: 'skipped' });
+    setCaseStatus(c.id, 'needs_you', now, { needs_attention: 1, attention_reason: 'Says they sent payment. Check, then record it.', paused_at: now });
+  }
+  logEvent(customerId, c.id, 'claims_paid', 'Said on their payment page that they’ve sent payment', now);
 }
 
 export function choosePlan(customerId: number, count: number, now = getNow()) {
