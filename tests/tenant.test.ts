@@ -12,8 +12,9 @@ const svc = await import('../lib/service');
 const repo = await import('../lib/repo');
 const { getSettings, saveSettings } = await import('../lib/settings');
 
-const A = { businessId: 'biz_a', demo: false };
-const B = { businessId: 'biz_b', demo: false };
+const { createBusiness, tenantOf } = await import('../lib/accounts');
+const A = tenantOf(createBusiness({ name: 'A' }));
+const B = tenantOf(createBusiness({ name: 'B' }));
 const csv = ['Customer,Email,Invoice,Amount,Due', 'Harbor Street Bakery,dana@x.co,#1,780,2026-01-01'].join('\n');
 
 describe('one database per business', () => {
@@ -56,8 +57,8 @@ describe('one database per business', () => {
   });
 
   it('deletes a business for good', () => {
-    expect(fs.existsSync(businessDbFile('biz_b'))).toBe(true);
-    deleteBusinessDb('biz_b');
-    expect(fs.existsSync(businessDbFile('biz_b'))).toBe(false);
+    expect(fs.existsSync(businessDbFile(B.businessId))).toBe(true);
+    deleteBusinessDb(B.businessId);
+    expect(fs.existsSync(businessDbFile(B.businessId))).toBe(false);
   });
 });

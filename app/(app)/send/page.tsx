@@ -12,6 +12,7 @@ import { getCustomer, listMessagesByStatus } from '@/lib/repo';
 import { STEPS } from '@/lib/sequence';
 import { caseInvoices } from '@/lib/service';
 import { getSettings } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 import type { Message } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,7 @@ function labelOf(m: Message) {
 }
 
 export default async function SendPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const { tab = 'ready' } = await searchParams;
   const { timezone } = getSettings();
   const ready = listMessagesByStatus(['ready']).reverse();

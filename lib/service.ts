@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { registerPayToken } from './accounts';
 import { aiEnabled, classifyReply, generateTemplateSet, personalizeMessage } from './ai';
 import { parseInvoiceCsv, type ParsedRow } from './csv';
 import { all, get, run, tx } from './db';
@@ -49,11 +50,12 @@ import {
 } from './sequence';
 import { getClockOffset, getNow, getSettings, setClockOffset, type Settings } from './settings';
 import { firstName, renderTemplate, templateVars } from './templates';
+import { currentTenant } from './tenant';
 import { DAY, daysOverdue, localDate, monthKey, nextSmsWindow } from './time';
 import type { TemplateSetContent } from './tones';
 import type { Case, CaseStatus, Channel, Customer, Invoice, Message, ReplyKind } from './types';
 
-const token = () => randomBytes(12).toString('base64url');
+const token = () => randomBytes(24).toString('base64url');
 
 /** Open invoices in a case: what reminders cover and the pay page collects. */
 export function caseInvoices(customerId: number, caseId: number): Invoice[] {
@@ -118,6 +120,7 @@ export async function importCsv(text: string, now = getNow()) {
       }
       let customer = findCustomer({ name: inv.customerName, email: inv.email, phone: inv.phone });
       if (!customer) {
+        const payToken = token();
         const id = run(
           `INSERT INTO customers (name, type, contact_name, email, phone, preferred_channel, tags, pay_token, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -128,9 +131,10 @@ export async function importCsv(text: string, now = getNow()) {
           inv.phone,
           inv.email ? 'email' : 'sms',
           JSON.stringify(inv.tags),
-          token(),
+          payToken,
           now,
         ).id;
+        registerPayToken(payToken, currentTenant().businessId);
         customer = getCustomer(id)!;
         logEvent(id, null, 'customer_added', 'Added from an import', now);
       } else {
@@ -197,7 +201,9 @@ export interface RunResult {
   failed: number;
 }
 
+/** Whether this business can really send on a channel. Demo workspaces never can. */
 function providerFor(channel: Channel): boolean {
+  if (currentTenant().demo) return false;
   return channel === 'email' ? resendConfigured() : twilioConfigured();
 }
 

@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { requireBusiness } from '@/lib/auth';
 import { formatLongDate, formatShortDate, money } from '@/lib/format';
+import { enterPayLink } from '@/lib/pay-access';
 import { providerStatus, retrieveCheckoutSession } from '@/lib/providers';
 import { getCustomerByToken, getOpenCase, listInstallments } from '@/lib/repo';
 import { PLAN_OFFER_STEP, splitInstallments } from '@/lib/sequence';
@@ -14,8 +14,8 @@ import { daysBetween, localDate } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
 
-export async function generateMetadata(): Promise<Metadata> {
-  await requireBusiness();
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  enterPayLink((await params).token);
   return { title: `Pay ${getSettings().businessName}`, robots: { index: false } };
 }
 
@@ -47,8 +47,8 @@ export default async function PayPage({
   params: Promise<{ token: string }>;
   searchParams: Promise<{ paid?: string; plan?: string; error?: string; session_id?: string }>;
 }) {
-  await requireBusiness();
   const { token } = await params;
+  enterPayLink(token);
   const query = await searchParams;
   const customer = getCustomerByToken(token);
   if (!customer) notFound();

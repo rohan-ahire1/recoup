@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { renameBusiness } from '@/lib/accounts';
 import { requireBusiness } from '@/lib/auth';
 import { normalizeEmail, normalizePhone, parseAmount } from '@/lib/csv';
 import { isDemoMode } from '@/lib/providers';
@@ -9,6 +10,7 @@ import { getOpenCase, getTemplateSet } from '@/lib/repo';
 import { TEMPLATE_KEYS } from '@/lib/sequence';
 import * as svc from '@/lib/service';
 import { getSettings, saveSettings, type DeliveryMode } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 import type { TemplateSetContent } from '@/lib/tones';
 import type { Channel, ReplyKind } from '@/lib/types';
 
@@ -23,20 +25,20 @@ function requireDemo() {
 // ---------------------------------------------------------------- demo
 
 export async function runNowAction() {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   await svc.runDueActions();
   refresh();
 }
 
 export async function advanceAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   requireDemo();
   await svc.advanceClock(num(form, 'days') || 1);
   refresh();
 }
 
 export async function resetDemoAction() {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   requireDemo();
   const { seedDemo } = await import('@/lib/sample');
   await seedDemo();
@@ -45,7 +47,7 @@ export async function resetDemoAction() {
 }
 
 export async function simulatePaymentAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   requireDemo();
   const customerId = num(form, 'customerId');
   const c = getOpenCase(customerId);
@@ -57,38 +59,38 @@ export async function simulatePaymentAction(form: FormData) {
 // ---------------------------------------------------------------- drafts
 
 export async function markSentAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   svc.markSent(num(form, 'id'));
   await svc.runDueActions();
   refresh();
 }
 
 export async function markAllSentAction() {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   svc.markAllSent();
   refresh();
 }
 
 export async function skipAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   svc.skipMessage(num(form, 'id'));
   refresh();
 }
 
 export async function saveDraftAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   svc.saveDraft(num(form, 'id'), form.has('subject') ? str(form, 'subject') : null, String(form.get('body') ?? ''));
   refresh();
 }
 
 export async function sendNowAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   await svc.sendDraftNow(num(form, 'id'));
   refresh();
 }
 
 export async function personalizeAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   await svc.personalizeDraft(num(form, 'id'));
   refresh();
 }
@@ -96,7 +98,7 @@ export async function personalizeAction(form: FormData) {
 // ---------------------------------------------------------------- customers
 
 export async function logReplyAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const kind = str(form, 'kind') as ReplyKind | 'auto';
   await svc.logReply({
     customerId: num(form, 'customerId'),
@@ -109,44 +111,44 @@ export async function logReplyAction(form: FormData) {
 }
 
 export async function pauseAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   svc.pauseCase(num(form, 'customerId'));
   refresh();
 }
 
 export async function resumeAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   await svc.resumeCase(num(form, 'customerId'));
   refresh();
 }
 
 export async function handledAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   svc.markHandled(num(form, 'customerId'));
   refresh();
 }
 
 export async function promiseAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   svc.setPromise(num(form, 'customerId'), str(form, 'date'));
   refresh();
 }
 
 export async function setToneAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const v = str(form, 'templateSetId');
   svc.setCustomerTone(num(form, 'customerId'), v && v !== 'default' ? Number(v) : null);
   refresh();
 }
 
 export async function doNotChaseAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   await svc.setDoNotChase(num(form, 'customerId'), str(form, 'on') === '1');
   refresh();
 }
 
 export async function updateCustomerAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const id = num(form, 'customerId');
   const email = str(form, 'email');
   const phone = str(form, 'phone');
@@ -168,20 +170,20 @@ export async function updateCustomerAction(form: FormData) {
 // ---------------------------------------------------------------- invoices & payments
 
 export async function markInvoicePaidAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   svc.markInvoicePaid(num(form, 'invoiceId'));
   await svc.runDueActions();
   refresh();
 }
 
 export async function writeOffAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   await svc.writeOffInvoice(num(form, 'invoiceId'));
   refresh();
 }
 
 export async function recordPaymentAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const cents = parseAmount(str(form, 'amount'));
   if (!cents) return;
   svc.recordPayment({ customerId: num(form, 'customerId'), amountCents: cents, source: 'manual', method: str(form, 'method') || null });
@@ -204,7 +206,7 @@ function contentFrom(form: FormData, base: TemplateSetContent): TemplateSetConte
 }
 
 export async function duplicateTemplateAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const base = getTemplateSet(num(form, 'baseId'));
   if (!base) return;
   const id = svc.createTemplateSet(`${base.name} (my version)`, base.description ?? '', base.templates);
@@ -213,14 +215,14 @@ export async function duplicateTemplateAction(form: FormData) {
 }
 
 export async function createTemplateWithAIAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const id = await svc.createTemplateSetWithAI(str(form, 'name'), str(form, 'description'));
   refresh();
   redirect(`/templates/${id}`);
 }
 
 export async function updateTemplateAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const id = num(form, 'id');
   const set = getTemplateSet(id);
   if (!set) return;
@@ -230,14 +232,14 @@ export async function updateTemplateAction(form: FormData) {
 }
 
 export async function deleteTemplateAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   svc.deleteTemplateSet(num(form, 'id'));
   refresh();
   redirect('/templates');
 }
 
 export async function setDefaultTemplateAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const v = str(form, 'id');
   saveSettings({ defaultTemplateSet: v === 'auto' ? 'auto' : Number(v) });
   refresh();
@@ -246,7 +248,7 @@ export async function setDefaultTemplateAction(form: FormData) {
 // ---------------------------------------------------------------- settings & views
 
 export async function saveSettingsAction(form: FormData) {
-  await requireBusiness();
+  const { businessId } = enterBusiness(await requireBusiness());
   const current = getSettings();
   const timezone = str(form, 'timezone') || current.timezone;
   try {
@@ -254,8 +256,10 @@ export async function saveSettingsAction(form: FormData) {
   } catch {
     throw new Error(`Unknown time zone: ${timezone}`);
   }
+  const businessName = str(form, 'businessName') || current.businessName;
+  renameBusiness(businessId, businessName);
   saveSettings({
-    businessName: str(form, 'businessName') || current.businessName,
+    businessName,
     senderName: str(form, 'senderName'),
     timezone,
     replyToEmail: str(form, 'replyToEmail'),
@@ -266,7 +270,7 @@ export async function saveSettingsAction(form: FormData) {
 }
 
 export async function saveViewAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const name = str(form, 'name');
   const query = str(form, 'query');
   if (!name) return;
@@ -276,13 +280,13 @@ export async function saveViewAction(form: FormData) {
 }
 
 export async function deleteViewAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   saveSettings({ savedViews: getSettings().savedViews.filter((v) => v.name !== str(form, 'name')) });
   refresh();
 }
 
 export async function toggleDemoBarAction(form: FormData) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   saveSettings({ showDemoBar: str(form, 'on') === '1' });
   refresh();
 }

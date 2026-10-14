@@ -10,6 +10,7 @@ import { getTemplateSet } from '@/lib/repo';
 import { STEPS, TEMPLATE_KEYS, type TemplateKey } from '@/lib/sequence';
 import { getSettings } from '@/lib/settings';
 import { TEMPLATE_VARIABLES } from '@/lib/templates';
+import { enterBusiness } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ function stepTitle(key: TemplateKey) {
 }
 
 export default async function TemplatePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const { id } = await params;
   const { saved } = await searchParams;
   const set = getTemplateSet(Number(id));

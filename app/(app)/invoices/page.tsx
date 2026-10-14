@@ -9,6 +9,7 @@ import { requireBusiness } from '@/lib/auth';
 import { formatShortDate, money, plural } from '@/lib/format';
 import { AGE_BUCKETS } from '@/lib/service';
 import { getNow } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 import { invoiceRows, type InvoiceQuery, type InvoiceRow } from '@/lib/views';
 
 export const dynamic = 'force-dynamic';
@@ -38,7 +39,7 @@ function statusText(r: InvoiceRow) {
 }
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<InvoiceQuery> }) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const q = await searchParams;
   const rows = invoiceRows(q, getNow());
   const query = new URLSearchParams(Object.entries(q).filter(([, v]) => v) as [string, string][]).toString();

@@ -6,13 +6,14 @@ import { requireBusiness } from '@/lib/auth';
 import { money, plural } from '@/lib/format';
 import { allCustomerSummaries, breakdowns, overview } from '@/lib/service';
 import { getNow } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
 const AGING_COLORS = ['#f2c57c', '#e8a33d', '#c07a17', '#8a5610'];
 
 export default async function ReportsPage() {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const now = getNow();
   const o = overview(now);
   const b = breakdowns(now);
