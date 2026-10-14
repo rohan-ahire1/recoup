@@ -70,6 +70,7 @@ export const PAIRS = [
   ['sand', 'ink-2', 4.5],
   ['sand', 'teal', 4.5],
   ['sand/85', 'teal', 4.5],
+  ['sand/85', 'ink', 4.5],
   ['paper', 'teal', 4.5],
   ['paper', 'teal-strong', 4.5],
   ['paper', 'ink', 4.5],

@@ -36,7 +36,14 @@ Recoup should feel like a capable, warm office manager, not a debt collector and
 - Premium features: a dashed linen box with a marigold "Premium · soon" chip; hidden entirely when AI is configured.
 
 ## Motion
-150–200ms ease-out on hover/press and on disclosure. No page-load choreography.
+- App screens: 150–200ms ease-out on hover/press and on disclosure. No page-load choreography; people come here to work.
+- Public pages (landing): the hero settles in once on load (text, photo, then the reminder and "paid" cards), sections rise into view on scroll (CSS scroll timelines, no JS), photos ease-zoom on hover. Classes `enter*`, `reveal`, `reveal-mock`, `zoom` in `app/globals.css`.
+- Everything moving sits behind `prefers-reduced-motion: no-preference`; without it the page is static and complete.
+
+## Imagery
+- Real photos of small-business owners at work (Unsplash, free licence), warm and daylight, never stock handshakes or piles of cash. Stored as WebP in `assets/img/`, served through `next/image` with blur placeholders; only the hero loads eagerly.
+- Photos sit in `rounded-pay`/`rounded-panel` frames with the edge ring. Text over a photo goes on an ink gradient in sand.
+- Product shots are built from the real components (Avatar, TrackDots, StatePill, bubbles), not screenshots, so they never drift from the app.
 
 ## Icons
 One stroke family: 24×24, 1.5px stroke, round caps and joins, `currentColor`.
