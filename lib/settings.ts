@@ -7,6 +7,8 @@ export interface Settings {
   senderName: string;
   timezone: string;
   replyToEmail: string;
+  /** Printed at the foot of every automatic email. Needed before automatic sending. */
+  mailingAddress: string;
   /** Shown on the payment page: how customers pay (bank transfer, check, Zelle…). */
   payInstructions: string;
   /** Optional link to the business's own payment page (Square, PayPal, QuickBooks…). */
@@ -28,6 +30,7 @@ const DEFAULTS: Settings = {
   senderName: 'Marco',
   timezone: DEFAULT_TIMEZONE,
   replyToEmail: '',
+  mailingAddress: '',
   payInstructions: '',
   payLink: '',
   deliveryMode: 'prepare',

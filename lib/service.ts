@@ -5,7 +5,8 @@ import { parseInvoiceCsv, type ParsedRow } from './csv';
 import { all, get, run, tx } from './db';
 import { formatDateLong, money, plural } from './format';
 import { suggestedTone, summarize, trackRecord, type TrackRecord } from './history';
-import { sendEmail, type SendResult } from './providers';
+import { sendBusinessEmail, sendingBlocked } from './email';
+import type { SendResult } from './providers';
 import { resendConfigured } from './providers/email';
 import {
   builtinSet,
@@ -211,13 +212,7 @@ function autoSends(channel: Channel, settings: Settings): boolean {
 
 async function deliver(message: { channel: Channel; toAddr: string | null; subject: string | null; body: string }, settings: Settings): Promise<SendResult> {
   if (message.channel === 'sms') throw new Error('Texts are sent from the business’s own phone');
-  return sendEmail({
-    to: message.toAddr!,
-    subject: message.subject ?? `Message from ${settings.businessName}`,
-    text: message.body,
-    fromName: settings.businessName,
-    replyTo: settings.replyToEmail || undefined,
-  });
+  return sendBusinessEmail({ to: message.toAddr!, subject: message.subject ?? `Message from ${settings.businessName}`, text: message.body }, settings);
 }
 
 function stepLabel(m: Pick<Message, 'step' | 'actionKey'>): string {
@@ -283,8 +278,9 @@ async function prepare(customer: Customer, c: Case, action: Action, now: number)
 
   const label = stepLabel({ step: action.step ?? null, actionKey: action.key });
   const via = action.channel === 'email' ? 'email' : 'text';
-  if (!autoSends(action.channel, settings)) {
-    logEvent(customer.id, c.id, 'prepared', `${label} ready to send by ${via}`, now);
+  const blocked = autoSends(action.channel, settings) ? sendingBlocked(currentTenant().businessId) : null;
+  if (!autoSends(action.channel, settings) || blocked) {
+    logEvent(customer.id, c.id, 'prepared', `${label} ready to send by ${via}${blocked ? `. ${blocked}, so it waits for you.` : ''}`, now);
     return 'prepared' as const;
   }
   const result = await deliver({ channel: action.channel, toAddr: to, subject, body }, settings);
@@ -293,7 +289,7 @@ async function prepare(customer: Customer, c: Case, action: Action, now: number)
     logEvent(customer.id, c.id, 'send_failed', `${label} by ${via} failed: ${result.error}`, now);
     return 'failed' as const;
   }
-  updateMessage(claim.id, { status: 'sent', provider: result.provider, sent_at: now });
+  updateMessage(claim.id, { status: 'sent', provider: result.provider, provider_id: result.providerId, sent_at: now });
   updateCase(c.id, { last_sent_at: now }, now);
   return 'sent' as const;
 }
@@ -428,12 +424,14 @@ export async function sendDraftNow(messageId: number, now = getNow()) {
   if (!m || m.status !== 'ready') return;
   const channel = m.channel as Channel; // drafts are only ever email or text
   if (!providerFor(channel)) throw new Error(`No ${channel === 'email' ? 'email' : 'texting'} service is connected`);
+  const blocked = sendingBlocked(currentTenant().businessId);
+  if (blocked) throw new Error(blocked);
   const result = await deliver({ ...m, channel }, getSettings());
   if (result.status === 'failed') {
     updateMessage(m.id, { error: result.error ?? 'Unknown error' });
     throw new Error(result.error ?? 'Sending failed');
   }
-  updateMessage(m.id, { status: 'sent', sent_at: now, provider: result.provider, error: null });
+  updateMessage(m.id, { status: 'sent', sent_at: now, provider: result.provider, provider_id: result.providerId, error: null });
   if (m.caseId) updateCase(m.caseId, { last_sent_at: now }, now);
   logEvent(m.customerId, m.caseId, 'sent', `${stepLabel(m)} sent by ${m.channel === 'email' ? 'email' : 'text'}`, now);
 }

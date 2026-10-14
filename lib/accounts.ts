@@ -61,6 +61,33 @@ CREATE TABLE pay_tokens (
 );
 CREATE INDEX pay_tokens_business ON pay_tokens(business_id);
 `,
+  `
+-- Set when bounces or spam complaints stop a business's automatic email.
+ALTER TABLE businesses ADD COLUMN email_paused_at INTEGER;
+ALTER TABLE businesses ADD COLUMN email_paused_reason TEXT;
+
+-- A business's own sending address, verified through Resend.
+CREATE TABLE email_domains (
+  business_id TEXT PRIMARY KEY REFERENCES businesses(id) ON DELETE CASCADE,
+  from_email TEXT NOT NULL,
+  domain TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  resend_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  records TEXT NOT NULL DEFAULT '[]',
+  created_at INTEGER NOT NULL,
+  checked_at INTEGER
+);
+
+-- Every email sent through the shared sender, so bounce reports find their business
+-- and the daily cap can be counted. Kept for 30 days.
+CREATE TABLE sent_emails (
+  provider_id TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  sent_at INTEGER NOT NULL,
+  outcome TEXT
+);
+CREATE INDEX sent_emails_business ON sent_emails(business_id, sent_at);
+`,
 ];
 
 const MINUTE = 60_000;
@@ -131,9 +158,12 @@ export interface Business {
   plan: string;
   createdAt: number;
   expiresAt: number | null;
+  emailPausedAt: number | null;
+  emailPausedReason: string | null;
 }
 
-const BUSINESS_COLS = 'b.id, b.name, b.demo, b.plan, b.created_at AS createdAt, b.expires_at AS expiresAt';
+const BUSINESS_COLS =
+  'b.id, b.name, b.demo, b.plan, b.created_at AS createdAt, b.expires_at AS expiresAt, b.email_paused_at AS emailPausedAt, b.email_paused_reason AS emailPausedReason';
 const toBusiness = (r: Record<string, unknown> | undefined): Business | undefined =>
   r ? ({ ...(r as unknown as Business), demo: Boolean(r.demo) }) : undefined;
 
@@ -234,6 +264,71 @@ export function businessForPayToken(token: string): Business | undefined {
   );
 }
 
+// ---------------------------------------------------------------- email
+
+export interface EmailDomain {
+  businessId: string;
+  fromEmail: string;
+  domain: string;
+  resendId: string;
+  /** Resend's status: not_started, pending, verified, failed or temporary_failure. */
+  status: string;
+  records: { record: string; name: string; type: string; value: string; priority?: number; status?: string }[];
+  checkedAt: number | null;
+}
+
+export function getEmailDomain(businessId: string): EmailDomain | undefined {
+  const r = adb()
+    .prepare(
+      'SELECT business_id AS businessId, from_email AS fromEmail, domain, resend_id AS resendId, status, records, checked_at AS checkedAt FROM email_domains WHERE business_id = ?',
+    )
+    .get(businessId) as (Omit<EmailDomain, 'records'> & { records: string }) | undefined;
+  return r ? { ...r, records: JSON.parse(r.records) } : undefined;
+}
+
+export function saveEmailDomain(d: Omit<EmailDomain, 'checkedAt'>, now = Date.now()) {
+  adb()
+    .prepare(
+      `INSERT INTO email_domains (business_id, from_email, domain, resend_id, status, records, created_at, checked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(business_id) DO UPDATE SET from_email = excluded.from_email, domain = excluded.domain, resend_id = excluded.resend_id,
+         status = excluded.status, records = excluded.records, checked_at = excluded.checked_at`,
+    )
+    .run(d.businessId, d.fromEmail, d.domain, d.resendId, d.status, JSON.stringify(d.records), now, now);
+}
+
+export function removeEmailDomain(businessId: string) {
+  adb().prepare('DELETE FROM email_domains WHERE business_id = ?').run(businessId);
+}
+
+export function recordSentEmail(providerId: string, businessId: string, now = Date.now()) {
+  adb().prepare('INSERT OR IGNORE INTO sent_emails (provider_id, business_id, sent_at) VALUES (?, ?, ?)').run(providerId, businessId, now);
+}
+
+/** Notes a bounce or complaint. Returns the business it belongs to, once per email. */
+export function recordEmailOutcome(providerId: string, outcome: 'bounced' | 'complained'): string | undefined {
+  const r = adb()
+    .prepare('UPDATE sent_emails SET outcome = ? WHERE provider_id = ? AND outcome IS NULL RETURNING business_id AS businessId')
+    .get(outcome, providerId) as { businessId: string } | undefined;
+  return r?.businessId;
+}
+
+export function emailStats(businessId: string, sinceMs: number) {
+  return adb()
+    .prepare(
+      `SELECT COUNT(*) AS sent, COALESCE(SUM(outcome = 'bounced'), 0) AS bounced, COALESCE(SUM(outcome = 'complained'), 0) AS complained
+       FROM sent_emails WHERE business_id = ? AND sent_at >= ?`,
+    )
+    .get(businessId, sinceMs) as { sent: number; bounced: number; complained: number };
+}
+
+export function pauseBusinessEmail(businessId: string, reason: string, now = Date.now()) {
+  adb().prepare('UPDATE businesses SET email_paused_at = ?, email_paused_reason = ? WHERE id = ? AND email_paused_at IS NULL').run(now, reason, businessId);
+}
+
+export function resumeBusinessEmail(businessId: string) {
+  adb().prepare('UPDATE businesses SET email_paused_at = NULL, email_paused_reason = NULL WHERE id = ?').run(businessId);
+}
+
 // ---------------------------------------------------------------- housekeeping
 
 /** Drop expired demos, sessions and sign-in links. Returns how many demos went. */
@@ -243,5 +338,6 @@ export function cleanUp(now = Date.now()): number {
   for (const { id } of demos) deleteBusiness(id);
   d.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now);
   d.prepare('DELETE FROM login_tokens WHERE expires_at < ?').run(now - DAY);
+  d.prepare('DELETE FROM sent_emails WHERE sent_at < ?').run(now - 30 * DAY);
   return demos.length;
 }

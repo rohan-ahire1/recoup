@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { renameBusiness } from '@/lib/accounts';
 import { requireBusiness } from '@/lib/auth';
 import { normalizeEmail, normalizePhone, parseAmount } from '@/lib/csv';
+import { addOwnDomain, checkOwnDomain, removeOwnDomain } from '@/lib/email';
 import { isDemoMode } from '@/lib/providers';
 import { getOpenCase, getTemplateSet } from '@/lib/repo';
 import { TEMPLATE_KEYS } from '@/lib/sequence';
@@ -257,18 +258,46 @@ export async function saveSettingsAction(form: FormData) {
     throw new Error(`Unknown time zone: ${timezone}`);
   }
   const businessName = str(form, 'businessName') || current.businessName;
+  // Automatic email carries the business's postal address, as the law for commercial email expects.
+  const needsAddress = str(form, 'deliveryMode') === 'auto' && !str(form, 'mailingAddress');
   renameBusiness(businessId, businessName);
   saveSettings({
     businessName,
     senderName: str(form, 'senderName'),
     timezone,
     replyToEmail: str(form, 'replyToEmail'),
+    mailingAddress: str(form, 'mailingAddress').slice(0, 300),
     payInstructions: str(form, 'payInstructions').slice(0, 2000),
     payLink: cleanPayLink(str(form, 'payLink')),
-    deliveryMode: (str(form, 'deliveryMode') as DeliveryMode) === 'auto' ? 'auto' : 'prepare',
+    deliveryMode: (str(form, 'deliveryMode') as DeliveryMode) === 'auto' && !needsAddress ? 'auto' : 'prepare',
   });
   refresh();
-  redirect('/settings?saved=1');
+  redirect(needsAddress ? '/settings?error=address' : '/settings?saved=1');
+}
+
+// ---------------------------------------------------------------- own email domain
+
+export async function addEmailDomainAction(form: FormData) {
+  const { businessId } = enterBusiness(await requireBusiness());
+  if (isDemoMode()) redirect('/settings');
+  const from = normalizeEmail(str(form, 'fromEmail'));
+  const error = from ? await addOwnDomain(businessId, from) : 'That doesn’t look like an email address.';
+  refresh();
+  redirect(error ? `/settings?domainError=${encodeURIComponent(error)}#email` : '/settings#email');
+}
+
+export async function checkEmailDomainAction() {
+  const { businessId } = enterBusiness(await requireBusiness());
+  await checkOwnDomain(businessId);
+  refresh();
+  redirect('/settings?checked=1#email');
+}
+
+export async function removeEmailDomainAction() {
+  const { businessId } = enterBusiness(await requireBusiness());
+  await removeOwnDomain(businessId);
+  refresh();
+  redirect('/settings#email');
 }
 
 export async function saveViewAction(form: FormData) {

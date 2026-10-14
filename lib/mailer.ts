@@ -5,6 +5,12 @@ export function platformEmailConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.AUTH_EMAIL_FROM);
 }
 
+/** AUTH_EMAIL_FROM may be a bare address or already "Name <address>". */
+function platformFrom(): string {
+  const from = process.env.AUTH_EMAIL_FROM!.trim();
+  return from.includes('<') ? from : `Recoup <${from}>`;
+}
+
 export function loginLink(token: string): string {
   return `${baseUrl()}/login/verify?token=${encodeURIComponent(token)}`;
 }
@@ -28,7 +34,7 @@ export async function sendLoginEmail(to: string, token: string): Promise<{ ok: b
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ from: `Recoup <${process.env.AUTH_EMAIL_FROM}>`, to: [to], subject: 'Your Recoup sign-in link', text }),
+      body: JSON.stringify({ from: platformFrom(), to: [to], subject: 'Your Recoup sign-in link', text }),
     });
     if (!res.ok) console.error('Sign-in email failed', res.status, await res.text());
     return { ok: res.ok };

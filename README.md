@@ -52,9 +52,11 @@ With no keys set, it runs in **demo mode**. Nothing is really sent, payment page
 | What | Variables | Notes |
 | --- | --- | --- |
 | AI features | `ANTHROPIC_API_KEY` | Uses Claude Opus 5, with the server-side refusal fallback. |
-| Email sending (Resend) | `RESEND_API_KEY`, `EMAIL_FROM` | Enables **Send now**, and **Send automatically** in Settings. |
+| Email sending (Resend) | `RESEND_API_KEY`, `EMAIL_FROM` | One shared sender for every business: "Harbor Bakery via Recoup <`EMAIL_FROM`>", replies to the business. Enables **Send now** and **Send automatically**. A business can verify its own domain in Settings. |
+| Bounces and complaints | `RESEND_WEBHOOK_SECRET` | Point a Resend webhook (`email.bounced`, `email.complained`) at `/api/webhooks/resend`. Bounces flag the customer; too many pause that business's automatic email. |
+| Daily cap | `EMAIL_DAILY_CAP` | Automatic emails per business per day. Default 200. |
 | Links | `PUBLIC_BASE_URL` | Used in payment links and sign-in emails. |
-| Sign-in emails | `AUTH_EMAIL_FROM` | Sender for sign-in links (with `RESEND_API_KEY`). |
+| Sign-in emails | `AUTH_EMAIL_FROM` | Sender address for sign-in links (with `RESEND_API_KEY`). Required in production. |
 | Scheduler | `CRON_SECRET` | Call `POST /api/cron/run` every 15 minutes (`Authorization: Bearer …`). |
 
 Demo controls only exist in demo workspaces ("Try the demo" on the home page). They never send real email and are deleted after 3 days.

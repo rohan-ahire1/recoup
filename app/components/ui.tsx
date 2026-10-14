@@ -10,13 +10,15 @@ export function Panel({
   className = '',
   as: Tag = 'section',
   lift = false,
+  id,
 }: {
   children: React.ReactNode;
   className?: string;
   as?: 'section' | 'div' | 'aside' | 'article';
   lift?: boolean;
+  id?: string;
 }) {
-  return <Tag className={`rounded-panel bg-paper ring-1 ring-edge ring-inset ${lift ? 'shadow-[var(--shadow-lift)]' : ''} ${className}`}>{children}</Tag>;
+  return <Tag id={id} className={`rounded-panel bg-paper ring-1 ring-edge ring-inset ${lift ? 'shadow-[var(--shadow-lift)]' : ''} ${className}`}>{children}</Tag>;
 }
 
 /** Every field you type into or pick from. One place, so borders and focus never drift. */

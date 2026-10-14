@@ -1,7 +1,7 @@
 import { currentTenant, hasTenant } from '../tenant';
 import { resendConfigured } from './email';
 
-export { sendEmail, type SendResult } from './email';
+export type { SendResult } from './email';
 
 export function providerStatus() {
   return { email: !isDemoMode() && resendConfigured() ? 'resend' : 'mock' } as const;

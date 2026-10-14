@@ -1,9 +1,10 @@
 import { deleteBusinessAction, signOutAction } from '@/app/account-actions';
-import { saveSettingsAction, toggleDemoBarAction } from '@/app/actions';
+import { addEmailDomainAction, checkEmailDomainAction, removeEmailDomainAction, saveSettingsAction, toggleDemoBarAction } from '@/app/actions';
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { Chip, FIELD, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
 import { aiEnabled } from '@/lib/ai';
-import { getUser } from '@/lib/accounts';
+import { getEmailDomain, getUser } from '@/lib/accounts';
+import { dailyCap, senderFor } from '@/lib/email';
 import { requireBusiness, requireSession } from '@/lib/auth';
 import { isDemoMode, providerStatus } from '@/lib/providers';
 import { getSettings } from '@/lib/settings';
@@ -27,14 +28,16 @@ function Connection({ name, detail, status }: { name: string; detail: string; st
 
 const connected = <span className="rounded-full bg-teal-soft px-3 py-1 text-sm font-semibold text-teal-strong">Connected</span>;
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string; domainError?: string; checked?: string }> }) {
   const { business } = enterBusiness(await requireBusiness());
   const session = await requireSession();
   const user = session.userId ? getUser(session.userId) : undefined;
-  const { saved, error } = await searchParams;
+  const { saved, error, domainError, checked } = await searchParams;
   const s = getSettings();
   const p = providerStatus();
   const canAuto = p.email !== 'mock';
+  const sender = senderFor(business.id, s);
+  const domain = getEmailDomain(business.id);
   const zones = TIMEZONES.includes(s.timezone) ? TIMEZONES : [s.timezone, ...TIMEZONES];
   const field = `mt-1 h-11 ${FIELD}`;
 
@@ -65,6 +68,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <label>
             Reply-to email
             <input name="replyToEmail" type="email" defaultValue={s.replyToEmail} placeholder="you@yourbusiness.com" className={field} />
+            <span className="mt-1 block font-normal text-faint">Customers’ replies to reminders land here.</span>
+          </label>
+          <label className="sm:col-span-2">
+            Mailing address
+            <input name="mailingAddress" defaultValue={s.mailingAddress} maxLength={300} placeholder="12 Main St, Springfield, IL 62701" className={field} />
+            <span className="mt-1 block font-normal text-faint">Printed at the bottom of emails Recoup sends for you. Needed for sending automatically.</span>
           </label>
         </Panel>
 
@@ -93,9 +102,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
         <Panel className="flex flex-col gap-3 p-6 sm:p-7">
           <h2 className="display text-section font-bold">Sending</h2>
+          {error === 'address' && <p className="text-sm font-semibold text-rust">Add your mailing address above to send automatically.</p>}
+          {business.emailPausedAt && (
+            <p className="rounded-block bg-rust-soft px-4 py-3 text-sm text-rust">
+              <span className="font-semibold">Automatic email is paused.</span> {business.emailPausedReason} Reminders wait in “To send” until we turn it back on. Reply to your sign-in email to ask.
+            </p>
+          )}
           {[
             { v: 'prepare', title: 'I’ll send them myself', detail: 'Recoup drafts each reminder. You open it in Gmail, Outlook, your mail app or your phone, and press send.' },
-            { v: 'auto', title: 'Send automatically', detail: canAuto ? 'Emails go out on their own. Texts still open on your phone for you to send.' : 'Needs email sending, below.' },
+            { v: 'auto', title: 'Send automatically', detail: canAuto ? `Emails go out on their own, up to ${dailyCap()} a day. Texts still open on your phone for you to send.` : 'Email sending isn’t set up on this server yet.' },
           ].map((o) => (
             <label key={o.v} className={`ease flex gap-3 rounded-block px-4 py-3.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal ${o.v === 'auto' && !canAuto ? 'opacity-60' : 'cursor-pointer'}`}>
               <input type="radio" name="deliveryMode" value={o.v} defaultChecked={s.deliveryMode === o.v} disabled={o.v === 'auto' && !canAuto} className="mt-1 accent-teal" />
@@ -112,6 +127,77 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           {saved && <span className="text-sm font-semibold text-teal">Saved</span>}
         </div>
       </form>
+
+      {canAuto && (
+        <Panel id="email" className="mt-8 flex scroll-mt-24 flex-col gap-4 p-6 text-sm sm:p-7">
+          <div>
+            <h2 className="display text-section font-bold">Email address</h2>
+            <p className="text-muted">
+              Automatic emails come from <span className="font-semibold text-ink break-all">{sender.from}</span>
+              {sender.replyTo ? <>, and replies go to <span className="font-semibold text-ink">{sender.replyTo}</span></> : '. Add a reply-to email above so replies reach you'}.
+            </p>
+          </div>
+          {domainError && <p className="font-semibold text-rust">{domainError}</p>}
+          {!domain ? (
+            <form action={addEmailDomainAction} className="flex flex-col gap-3 border-t border-linen pt-4">
+              <span className="font-semibold">Send from your own address</span>
+              <span className="text-muted">Optional. Use an address on your own domain, like billing@yourbusiness.com. You’ll add a few DNS records where your domain is managed.</span>
+              <div className="flex flex-wrap gap-2">
+                <input name="fromEmail" type="email" required placeholder="billing@yourbusiness.com" aria-label="Address to send from" className={`h-11 max-w-xs ${FIELD}`} />
+                <SubmitButton variant="outline" pendingLabel="Adding…">Set up</SubmitButton>
+              </div>
+            </form>
+          ) : domain.status === 'verified' ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-linen pt-4">
+              <span>
+                <span className="font-semibold">Sending as {domain.fromEmail}</span>
+                <span className="block text-muted">{domain.domain} is verified.</span>
+              </span>
+              <form action={removeEmailDomainAction}>
+                <SubmitButton variant="outline" pendingLabel="Removing…" confirm={`Stop sending from ${domain.fromEmail}? Emails go back to the Recoup address.`}>Stop using it</SubmitButton>
+              </form>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3 border-t border-linen pt-4">
+              <span className="font-semibold">Almost there: verify {domain.domain}</span>
+              <span className="text-muted">
+                Add these records where you manage {domain.domain} (GoDaddy, Cloudflare, Squarespace…), then check. Changes can take up to a few hours to show up.
+                {checked && domain.status !== 'verified' && <span className="block font-semibold text-rust">Not verified yet{domain.status === 'failed' ? ': the records didn’t match' : ''}.</span>}
+              </span>
+              <div className="overflow-x-auto rounded-block ring-1 ring-line">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-linen/60 text-muted">
+                    <tr>
+                      <th className="px-3 py-2 font-semibold">Type</th>
+                      <th className="px-3 py-2 font-semibold">Name</th>
+                      <th className="px-3 py-2 font-semibold">Value</th>
+                      <th className="px-3 py-2 font-semibold">Priority</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-linen">
+                    {domain.records.map((r) => (
+                      <tr key={`${r.type}-${r.name}-${r.value}`} className="align-top">
+                        <td className="px-3 py-2 font-semibold">{r.type}</td>
+                        <td className="px-3 py-2 font-mono break-all">{r.name}</td>
+                        <td className="min-w-48 px-3 py-2 font-mono break-all">{r.value}</td>
+                        <td className="px-3 py-2">{r.priority ?? ''}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <form action={checkEmailDomainAction}>
+                  <SubmitButton variant="primary" pendingLabel="Checking…">Check now</SubmitButton>
+                </form>
+                <form action={removeEmailDomainAction}>
+                  <SubmitButton variant="outline" pendingLabel="Removing…">Cancel</SubmitButton>
+                </form>
+              </div>
+            </div>
+          )}
+        </Panel>
+      )}
 
       {isDemoMode() && (
         <Panel className="mt-8 flex flex-wrap items-center justify-between gap-4 p-6 sm:p-7">
@@ -135,7 +221,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <p className="text-sm text-muted">Set these up on the server (see the README). Everything works without them.</p>
         <ul className="divide-y divide-linen">
           <Connection name="Gmail or Outlook mailbox" detail="Send from your own address and see replies here automatically." status={<Chip tone="outline">Coming soon</Chip>} />
-          <Connection name="Email sending (Resend)" detail="Send reminders directly, without opening your mail app." status={p.email !== 'mock' ? connected : <Chip tone="outline">RESEND_API_KEY</Chip>} />
+          <Connection name="Email sending" detail="Send reminders directly, without opening your mail app." status={p.email !== 'mock' ? connected : <Chip tone="outline">{isDemoMode() ? 'Off in the demo' : 'Not set up yet'}</Chip>} />
           <Connection name="AI assistant" detail="Personalizes messages, writes templates, and reads customer replies." status={aiEnabled() ? connected : <PremiumBadge />} />
         </ul>
       </Panel>
