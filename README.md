@@ -54,7 +54,7 @@ With no keys set, it runs in **demo mode**. Nothing is really sent, payment page
 | AI features | `ANTHROPIC_API_KEY` | Uses Claude Opus 5, with the server-side refusal fallback. |
 | Email sending (Resend) | `RESEND_API_KEY`, `EMAIL_FROM` | Enables **Send now**, and **Send automatically** in Settings. |
 | Texting (Twilio) | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Incoming webhook: `POST /api/webhooks/twilio` (signature verified; STOP/START handled). |
-| Payments (Stripe) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | `checkout.session.completed` goes to `POST /api/webhooks/stripe`. |
+| Payments (Stripe) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | `checkout.session.completed` and `checkout.session.async_payment_succeeded` go to `POST /api/webhooks/stripe`. |
 | Links | `PUBLIC_BASE_URL` | Used in payment links. |
 | Scheduler | `CRON_SECRET` | Call `POST /api/cron/run` every 15 minutes (`Authorization: Bearer …`). |
 
