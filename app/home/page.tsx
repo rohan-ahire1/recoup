@@ -79,8 +79,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
             <p className="mt-4 text-sm text-faint">No card, no setup. The demo is a sample business you can play with.</p>
           </div>
 
-          <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-            <div className="enter-photo relative aspect-[4/5] overflow-hidden rounded-pay shadow-[var(--shadow-lift)] ring-1 ring-edge ring-inset">
+          <div className="relative isolate mx-auto w-full max-w-md lg:max-w-none">
+            <span className="glow -top-10 -left-16 h-72 w-72 bg-marigold-soft/70" aria-hidden="true" />
+            <span className="glow -right-10 -bottom-12 h-80 w-80 bg-teal/20" aria-hidden="true" />
+            <div className="enter-photo grain-over relative aspect-[4/5] overflow-hidden rounded-pay shadow-[var(--shadow-lift)] ring-1 ring-edge ring-inset">
               <Image
                 src={heroOwner}
                 alt="A smiling stall owner in an apron checking his phone"
@@ -119,7 +121,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
         </section>
 
         {/* Works with */}
-        <section className="border-y border-line/80 bg-paper/50">
+        <section className="border-y border-line/70 bg-paper/40">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-center gap-x-10 gap-y-3 px-4 py-6 text-sm text-muted sm:px-6 lg:px-10">
             <span className="text-faint">Bring invoices from</span>
             <span className="inline-flex items-center gap-2 font-semibold text-ink-2"><Icon name="building" size={20} className="text-teal" />QuickBooks Online</span>
@@ -211,7 +213,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
         </section>
 
         {/* Who it's for */}
-        <section id="who" className="bg-paper/60 py-24 lg:py-32">
+        <section id="who" className="border-y border-line/70 bg-linen/55 py-24 lg:py-32">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-10">
             <div className="reveal flex flex-wrap items-end justify-between gap-6">
               <div className="max-w-2xl">
@@ -223,9 +225,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
             <ul className="mt-12 grid grid-cols-2 gap-4 lg:grid-cols-4 lg:gap-5">
               {TRADES.map((t) => (
                 <li key={t.label} className="reveal group">
-                  <div className="relative aspect-[3/4] overflow-hidden rounded-panel ring-1 ring-edge ring-inset">
+                  <div className="grain-over relative aspect-[3/4] overflow-hidden rounded-panel ring-1 ring-edge ring-inset">
                     <Image src={t.img} alt={t.alt} fill placeholder="blur" sizes="(min-width: 1024px) 270px, 45vw" className="zoom object-cover" />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/85 via-ink/40 to-transparent p-4 pt-16">
+                    <div className="absolute inset-x-0 bottom-0 z-[2] bg-gradient-to-t from-ink/85 via-ink/40 to-transparent p-4 pt-16">
                       <span className="display block text-section font-bold text-sand">{t.label}</span>
                       <span className="block text-sm text-sand/85">{t.note}</span>
                     </div>
@@ -257,9 +259,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
 
         {/* Final call */}
         <section className="px-4 pb-24 sm:px-6 lg:px-10">
-          <div className="reveal relative mx-auto max-w-6xl overflow-hidden rounded-pay">
+          <div className="reveal grain-over relative mx-auto max-w-6xl overflow-hidden rounded-pay">
             <Image src={openLate} alt="" fill placeholder="blur" sizes="(min-width: 1152px) 1152px, 100vw" className="object-cover" />
-            <div className="relative bg-gradient-to-r from-ink via-ink/90 to-ink/50 px-6 py-16 sm:px-12 sm:py-20">
+            <div className="relative z-[2] bg-gradient-to-r from-ink via-ink/90 to-ink/50 px-6 py-16 sm:px-12 sm:py-20">
               <h2 className="display max-w-xl text-heading font-bold text-balance text-sand sm:text-title">Stop doing the awkward follow-ups yourself.</h2>
               <p className="mt-4 max-w-lg text-lead text-sand/85">Set it up in a few minutes. Free while we’re getting started.</p>
               <div className="mt-8 flex flex-wrap gap-3">
