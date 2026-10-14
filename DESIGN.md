@@ -4,8 +4,7 @@ Recoup should feel like a capable, warm office manager, not a debt collector and
 
 ## Surface
 - Operate mode throughout the app; the customer-facing pay page is a calm, single-task version of the same world.
-- Ground is warm sand with a paper texture (fine flecks, faint fibres) and soft light: marigold-wash from the top left, teal-soft from the bottom right (`--paper-grain` and `body` in `app/globals.css`). Content sits on clean white panels with generous radius. No nested panels.
-- Photos and dark bands take the same grain (`.grain-over`) so they sit in the paper; landing heroes can add blurred colour light behind (`.glow`).
+- Ground is warm sand; content sits on white panels with generous radius. No nested panels.
 - Plain-English summaries lead ("Dana usually pays. Just a little late, now and then."), with numbers beside them.
 
 ## Color (tokens in app/globals.css)
