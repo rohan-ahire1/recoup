@@ -1,7 +1,8 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { ColumnChart } from '@/app/components/ColumnChart';
 import { Icon } from '@/app/components/icons';
-import { Avatar, ButtonLink, Empty, Panel, StatePill } from '@/app/components/ui';
+import { Avatar, BigMoney, ButtonLink, Panel, StatePill } from '@/app/components/ui';
 import { requireBusiness } from '@/lib/auth';
 import { CASE_LABELS, formatDateLong, formatDateTime, money, moneyShort, plural } from '@/lib/format';
 import { listInstallments, listMessagesByStatus } from '@/lib/repo';
@@ -10,6 +11,7 @@ import { allCustomerSummaries, breakdowns, overview, type CustomerState } from '
 import { getNow, getSettings } from '@/lib/settings';
 import { enterBusiness } from '@/lib/tenant';
 import { DAY, localDate, localParts } from '@/lib/time';
+import studio from '@/assets/img/studio.webp';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,9 +59,34 @@ export default async function Today() {
 
   if (summaries.length === 0) {
     return (
-      <Empty title="Let’s get your money back" action={<ButtonLink href="/import" variant="primary" icon="upload">Import invoices</ButtonLink>}>
-        Import a spreadsheet of invoices. Include paid ones too, and Recoup learns how each customer usually pays.
-      </Empty>
+      <Panel className="grid overflow-hidden lg:grid-cols-[1fr_minmax(0,0.9fr)]">
+        <div className="p-7 sm:p-10 lg:p-12">
+          <h1 className="display text-title font-bold text-balance">Let’s get your money back</h1>
+          <p className="mt-3 max-w-lg text-lead text-muted">Three steps, a few minutes. After that Recoup does the chasing and tells you when something needs you.</p>
+          <ol className="mt-8 flex flex-col gap-5">
+            {[
+              ['Bring your invoices', 'Connect QuickBooks or upload a spreadsheet. Include paid ones so Recoup learns who usually pays on time.'],
+              ['Check the first reminders', 'Each customer gets one friendly message covering everything they owe. Read it before anything goes out.'],
+              ['Let it run', 'Reminders stop the moment someone pays, replies, promises a date or disputes.'],
+            ].map(([title, body], n) => (
+              <li key={title} className="flex gap-4">
+                <span className="display num flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-sm font-bold text-sand">{n + 1}</span>
+                <span>
+                  <span className="block font-semibold">{title}</span>
+                  <span className="block text-muted">{body}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-9 flex flex-wrap gap-3">
+            <ButtonLink href="/import" variant="primary" icon="upload">Import invoices</ButtonLink>
+            <ButtonLink href="/settings" variant="outline" icon="gear">Settings first</ButtonLink>
+          </div>
+        </div>
+        <div className="relative hidden min-h-80 lg:block">
+          <Image src={studio} alt="A business owner on the phone at her laptop" fill placeholder="blur" sizes="560px" className="object-cover" />
+        </div>
+      </Panel>
     );
   }
 
@@ -108,29 +135,40 @@ export default async function Today() {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="max-w-3xl pb-2">
-        <h1 className="display text-title font-bold">
-          {greeting(localParts(now, timezone).hour)}
-          {senderName ? `, ${senderName}` : ''}.
-        </h1>
-        <p className="mt-2 text-lead leading-relaxed text-pretty text-muted">
-          Customers owe you <strong className="num font-semibold text-ink">{money(o.owedCents)}</strong>.{' '}
-          <strong className="num font-semibold text-teal">{money(o.recoveredThisMonth)}</strong> came back this month.{' '}
-          {ready.length ? (
-            <>
-              <strong className="font-semibold text-ink">{plural(ready.length, 'message')}</strong> {ready.length === 1 ? 'is' : 'are'} ready to send
-            </>
-          ) : (
-            'Nothing is waiting to send'
-          )}
-          {needsYou.length ? (
-            <>
-              , and <strong className="font-semibold text-ink">{plural(needsYou.length, 'customer')}</strong> {needsYou.length === 1 ? 'needs' : 'need'} you.
-            </>
-          ) : (
-            ', and nobody needs you right now.'
-          )}
-        </p>
+      <header className="grid items-end gap-6 pb-2 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)]">
+        <div className="max-w-3xl">
+          <h1 className="display text-title font-bold">
+            {greeting(localParts(now, timezone).hour)}
+            {senderName ? `, ${senderName}` : ''}.
+          </h1>
+          <p className="mt-2 text-lead leading-relaxed text-pretty text-muted">
+            Customers owe you <strong className="num font-semibold text-ink">{money(o.owedCents)}</strong>.{' '}
+            <strong className="num font-semibold text-teal">{money(o.recoveredThisMonth)}</strong> came back this month.{' '}
+            {ready.length ? (
+              <>
+                <strong className="font-semibold text-ink">{plural(ready.length, 'message')}</strong> {ready.length === 1 ? 'is' : 'are'} ready to send
+              </>
+            ) : (
+              'Nothing is waiting to send'
+            )}
+            {needsYou.length ? (
+              <>
+                , and <strong className="font-semibold text-ink">{plural(needsYou.length, 'customer')}</strong> {needsYou.length === 1 ? 'needs' : 'need'} you.
+              </>
+            ) : (
+              ', and nobody needs you right now.'
+            )}
+          </p>
+        </div>
+        <div className="relative overflow-hidden rounded-panel bg-teal p-6 text-paper shadow-[var(--shadow-lift)] sm:p-7">
+          <span className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-paper/10" aria-hidden="true" />
+          <span className="absolute -right-6 -bottom-24 h-40 w-40 rounded-full bg-paper/5" aria-hidden="true" />
+          <p className="relative text-sm text-sand/85">Recoup has brought back</p>
+          <BigMoney value={moneyShort(o.recoveredAll)} className="relative mt-1" />
+          <p className="relative mt-2 text-sm text-sand/85">
+            since you started · {Math.round(o.recoveryRate * 100)}% of everything chased
+          </p>
+        </div>
       </header>
 
       {/* ------------------------------------------------ the numbers */}
@@ -241,7 +279,7 @@ export default async function Today() {
                 const label = m.step ? STEPS.find((x) => x.step === m.step)!.label : m.actionKey?.startsWith('installment') ? 'Payment plan reminder' : 'Payment plan offer';
                 return (
                   <li key={m.id}>
-                    <Link href={`/customers/${m.customerId}`} className="ease flex items-center gap-4 rounded-block px-3 py-3 hover:bg-linen/60">
+                    <Link href={`/customers/${m.customerId}`} className="ease group flex items-center gap-4 rounded-block px-3 py-3 hover:bg-linen/60">
                       <Avatar name={s.customer.name} type={s.customer.type} size={40} />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-baseline gap-x-2">
@@ -254,7 +292,7 @@ export default async function Today() {
                         </div>
                       </div>
                       <span className="hidden text-sm font-semibold text-teal sm:inline">Review & send</span>
-                      <Icon name="chevronRight" className="text-faint" />
+                      <Icon name="chevronRight" className="ease text-faint group-hover:translate-x-0.5 group-hover:text-ink" />
                     </Link>
                   </li>
                 );

@@ -27,7 +27,8 @@ Recoup should feel like a capable, warm office manager, not a debt collector and
 
 ## Shape and depth
 - Corners are tokens: `rounded-pay` 24 · `rounded-panel` 20 · `rounded-block` 14 (blocks inside a panel) · `rounded-control` 10 (buttons, fields) · `rounded-tooltip` 8 · `rounded-tail` 4 (bubble tails, chart tops) · `rounded-full` for chips, pills, dots.
-- Panels are flat on sand; the one elevated element per screen (the composer) takes `0 20px 40px -24px rgba(35,32,27,.35)`.
+- Panels are flat on sand; the one elevated element per screen (the composer; on Today, the teal "brought back" card) takes `0 20px 40px -24px rgba(35,32,27,.35)`.
+- Buttons give a 2% press-in on click (`active:scale-[0.98]`); row chevrons nudge right on hover.
 
 ## Components
 - Pills for navigation and filters; chips for tags; tone cards (name + one-line description) as radio buttons.

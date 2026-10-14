@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { BigMoney, buttonClass } from '@/app/components/ui';
+import { Avatar, BigMoney, buttonClass } from '@/app/components/ui';
 import { formatLongDate, formatShortDate, money, moneyShort } from '@/lib/format';
 import { enterPayLink } from '@/lib/pay-access';
 import { getCustomerByToken, getOpenCase, listInstallments } from '@/lib/repo';
@@ -75,7 +75,10 @@ export default async function PayPage({
   return (
     <div className="min-h-screen px-4 py-10 sm:py-16">
       <main className="mx-auto flex max-w-md flex-col gap-6">
-        <p className="display text-center text-heading font-bold">{businessName}</p>
+        <div className="flex flex-col items-center gap-3 text-center">
+          <Avatar name={businessName} type="business" size={56} />
+          <p className="display text-heading font-bold">{businessName}</p>
+        </div>
 
         <div className="rounded-pay bg-paper p-6 ring-1 ring-edge ring-inset shadow-[var(--shadow-lift)] sm:p-8">
           {query.error && <p className="mb-5 rounded-block bg-rust-soft px-4 py-3 text-sm text-rust">{query.error === 'slow' ? 'Too many tries. Please wait a little and try again.' : 'Something went wrong. Please try again.'}</p>}

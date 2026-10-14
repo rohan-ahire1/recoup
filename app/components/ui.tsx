@@ -76,7 +76,7 @@ export type ButtonVariant = keyof typeof BUTTON;
 
 export function buttonClass(variant: ButtonVariant = 'quiet', size: 'sm' | 'md' | 'lg' = 'md') {
   const sizes = { sm: 'h-9 px-3 text-sm gap-1.5', md: 'h-11 px-4 text-[15px] gap-2', lg: 'h-[52px] px-5 text-base gap-2' };
-  return `ease inline-flex items-center justify-center rounded-control font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-55 ${sizes[size]} ${BUTTON[variant]}`;
+  return `ease inline-flex items-center justify-center rounded-control font-semibold active:scale-[0.98] disabled:active:scale-100 whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-55 ${sizes[size]} ${BUTTON[variant]}`;
 }
 
 export function ButtonLink({
