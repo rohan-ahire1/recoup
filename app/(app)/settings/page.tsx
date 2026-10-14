@@ -122,7 +122,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <Panel className="mt-8 flex flex-col gap-5 p-6 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="display text-[22px] font-bold">Account</h2>
+            <h2 className="display text-section font-bold">Account</h2>
             <p className="text-sm text-muted">{user ? <>Signed in as {user.email}</> : 'You’re trying the demo.'}</p>
           </div>
           <form action={signOutAction}>
@@ -135,7 +135,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <span className="text-muted">Removes every customer, invoice, message and setting for good. Download your invoices first if you need them.</span>
             {error === 'confirm' && <span className="font-semibold text-rust">Type the business name exactly to confirm.</span>}
             <div className="flex flex-wrap gap-2">
-              <input name="confirm" placeholder={`Type “${business.name}” to confirm`} aria-label="Business name to confirm" className={`${field} mt-0 max-w-xs`} />
+              <input name="confirm" placeholder={`Type “${business.name}” to confirm`} aria-label="Business name to confirm" className={`h-11 max-w-xs ${FIELD}`} />
               <SubmitButton variant="danger" pendingLabel="Deleting…" confirm="Delete this business and all of its data? This can’t be undone.">Delete business</SubmitButton>
             </div>
           </form>

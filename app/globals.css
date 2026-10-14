@@ -75,7 +75,7 @@ html {
 body {
   /* Sand with a faint paper grain. */
   background-color: var(--color-sand);
-  background-image: radial-gradient(rgb(35 32 27 / 0.035) 1px, transparent 1px);
+  background-image: radial-gradient(rgb(35 32 27 / 0.022) 1px, transparent 1px);
   background-size: 4px 4px;
   font-family: var(--font-sans);
   font-size: 15px;
