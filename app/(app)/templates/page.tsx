@@ -9,6 +9,7 @@ import { requireBusiness } from '@/lib/auth';
 import { preview } from '@/lib/preview';
 import { listTemplateSets, type TemplateSet } from '@/lib/repo';
 import { getSettings } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,7 @@ function SetCard({ set, isDefault, businessName, senderName }: { set: TemplateSe
 }
 
 export default async function TemplatesPage() {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const sets = listTemplateSets();
   const { defaultTemplateSet, businessName, senderName } = getSettings();
   const builtin = sets.filter((s) => s.builtin);

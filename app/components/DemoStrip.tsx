@@ -2,12 +2,13 @@ import { advanceAction, resetDemoAction } from '@/app/actions';
 import { requireBusiness } from '@/lib/auth';
 import { formatDateTime } from '@/lib/format';
 import { getClockOffset, getNow, getSettings } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 import { DAY } from '@/lib/time';
 import { SubmitButton } from './SubmitButton';
 
 /** Time travel for the demo. Only rendered in demo mode (no real texts or emails). */
 export async function DemoStrip() {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const { timezone } = getSettings();
   const ahead = Math.round(getClockOffset() / DAY);
   return (

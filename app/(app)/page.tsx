@@ -8,6 +8,7 @@ import { listInstallments, listMessagesByStatus } from '@/lib/repo';
 import { STEPS } from '@/lib/sequence';
 import { allCustomerSummaries, breakdowns, overview, type CustomerState } from '@/lib/service';
 import { getNow, getSettings } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 import { DAY, localDate, localParts } from '@/lib/time';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +45,7 @@ function Metric({ label, value, sub, tone }: { label: string; value: React.React
 }
 
 export default async function Today() {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const now = getNow();
   const { timezone, senderName } = getSettings();
   const o = overview(now);

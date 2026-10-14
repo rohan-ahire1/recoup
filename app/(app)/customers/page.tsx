@@ -9,6 +9,7 @@ import { requireBusiness } from '@/lib/auth';
 import { formatDateTime, money, plural, relativeTime } from '@/lib/format';
 import { allCustomerSummaries, ageBucket, AGE_BUCKETS, type CustomerSummary } from '@/lib/service';
 import { getNow, getSettings } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +62,7 @@ const select =
 const chevron = { backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e574b' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")" };
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<Query> }) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const q = await searchParams;
   const now = getNow();
   const { timezone, savedViews } = getSettings();

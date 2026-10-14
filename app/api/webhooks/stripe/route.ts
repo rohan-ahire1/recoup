@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireBusiness } from '@/lib/auth';
 import { verifyStripeSignature } from '@/lib/providers';
 import { recordPayment } from '@/lib/service';
+import { enterBusiness } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ interface StripeEvent {
  * finish as "unpaid" and only report "paid" in the second event).
  */
 export async function POST(req: Request) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const raw = await req.text();
   if (!verifyStripeSignature(raw, req.headers.get('stripe-signature'))) {
     return NextResponse.json({ error: 'Bad signature' }, { status: 400 });

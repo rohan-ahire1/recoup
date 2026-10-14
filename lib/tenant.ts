@@ -38,7 +38,13 @@ export function runAsBusiness<T>(t: Tenant, fn: () => T): T {
   return store.run(check(t), fn);
 }
 
-/** Switch the rest of this async flow to a business. Use at the top of pages and layouts. */
-export function enterBusiness(t: Tenant) {
+/**
+ * Switch the rest of the calling function to a business, and return it. Must run
+ * in the caller itself, not inside an awaited helper: a context set inside an
+ * async function doesn't flow back out to whoever awaited it. Hence
+ * `enterBusiness(await requireBusiness())` at the top of pages and actions.
+ */
+export function enterBusiness<T extends Tenant>(t: T): T {
   store.enterWith(check(t));
+  return t;
 }

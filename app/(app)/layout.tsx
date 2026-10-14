@@ -3,16 +3,18 @@ import { DemoStrip } from '@/app/components/DemoStrip';
 import { Icon } from '@/app/components/icons';
 import { NavLinks } from '@/app/components/NavLinks';
 import { StickyBar } from '@/app/components/StickyBar';
+import { buttonClass } from '@/app/components/ui';
 import { requireBusiness } from '@/lib/auth';
 import { initials } from '@/lib/format';
 import { isDemoMode } from '@/lib/providers';
 import { listMessagesByStatus } from '@/lib/repo';
 import { getSettings } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  await requireBusiness();
+  const { demo } = enterBusiness(await requireBusiness());
   const { businessName, showDemoBar } = getSettings();
   const toSend = listMessagesByStatus(['ready']).length;
   return (
@@ -26,6 +28,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <NavLinks toSend={toSend} />
           </div>
           <div className="ml-auto flex items-center gap-2">
+            {demo && (
+              <Link href="/login" className={buttonClass('teal', 'sm')}>
+                Use it for my business
+              </Link>
+            )}
             <Link href="/settings" aria-label="Settings" className="ease flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-linen hover:text-ink">
               <Icon name="gear" />
             </Link>

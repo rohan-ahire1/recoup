@@ -3,6 +3,7 @@ import { handleInboundSms } from '@/lib/service';
 import { verifyTwilioSignature } from '@/lib/providers';
 import { twilioConfigured } from '@/lib/providers/sms';
 import { baseUrl } from '@/lib/templates';
+import { enterBusiness } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ const twiml = (status = 200) =>
 
 /** Set this as the "A message comes in" webhook on your Twilio number or messaging service. */
 export async function POST(req: Request) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const form = await req.formData();
   const params: Record<string, string> = {};
   form.forEach((v, k) => (params[k] = String(v)));

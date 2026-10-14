@@ -1,13 +1,14 @@
 import Papa from 'papaparse';
 import { requireBusiness } from '@/lib/auth';
 import { getNow } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 import { invoiceRows, type InvoiceQuery } from '@/lib/views';
 
 export const dynamic = 'force-dynamic';
 
 /** The Invoices page, as a spreadsheet: same filters, same rows. */
 export async function GET(req: Request) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const q = Object.fromEntries(new URL(req.url).searchParams) as InvoiceQuery;
   const rows = invoiceRows(q, getNow()).map((r) => ({
     Invoice: `#${r.number}`,

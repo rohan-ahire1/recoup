@@ -29,6 +29,7 @@ import { STEPS } from '@/lib/sequence';
 import { summarizeCustomer } from '@/lib/service';
 import { getNow, getSettings } from '@/lib/settings';
 import { firstName as firstNameOf, payLink } from '@/lib/templates';
+import { enterBusiness } from '@/lib/tenant';
 import { daysBetween, localDate } from '@/lib/time';
 import type { CustomerEvent, Invoice, Message } from '@/lib/types';
 
@@ -136,7 +137,7 @@ function InvoiceTable({ invoices, today }: { invoices: Invoice[]; today: string 
 }
 
 export default async function CustomerPage({ params }: { params: Promise<{ id: string }> }) {
-  await requireBusiness();
+  enterBusiness(await requireBusiness());
   const { id } = await params;
   const customer = getCustomer(Number(id));
   if (!customer) notFound();

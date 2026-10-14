@@ -1,11 +1,13 @@
+import { deleteBusinessAction, signOutAction } from '@/app/account-actions';
 import { saveSettingsAction, toggleDemoBarAction } from '@/app/actions';
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { Chip, FIELD, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
 import { aiEnabled } from '@/lib/ai';
-import { requireBusiness } from '@/lib/auth';
-import { isDemoMode } from '@/lib/providers';
-import { providerStatus } from '@/lib/providers';
+import { getUser } from '@/lib/accounts';
+import { requireBusiness, requireSession } from '@/lib/auth';
+import { isDemoMode, providerStatus } from '@/lib/providers';
 import { getSettings } from '@/lib/settings';
+import { enterBusiness } from '@/lib/tenant';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,9 +27,11 @@ function Connection({ name, detail, status }: { name: string; detail: string; st
 
 const connected = <span className="rounded-full bg-teal-soft px-3 py-1 text-sm font-semibold text-teal-strong">Connected</span>;
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
-  await requireBusiness();
-  const { saved } = await searchParams;
+export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
+  const { business } = enterBusiness(await requireBusiness());
+  const session = await requireSession();
+  const user = session.userId ? getUser(session.userId) : undefined;
+  const { saved, error } = await searchParams;
   const s = getSettings();
   const p = providerStatus();
   const canAuto = p.email !== 'mock' || p.sms !== 'mock';
@@ -113,6 +117,29 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           <Connection name="Online payments (Stripe)" detail="Customers pay by card on their payment page." status={p.payments !== 'mock' ? connected : <Chip tone="outline">Test mode</Chip>} />
           <Connection name="AI assistant" detail="Personalizes messages, writes templates, and reads customer replies." status={aiEnabled() ? connected : <PremiumBadge />} />
         </ul>
+      </Panel>
+
+      <Panel className="mt-8 flex flex-col gap-5 p-6 sm:p-7">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="display text-[22px] font-bold">Account</h2>
+            <p className="text-sm text-muted">{user ? <>Signed in as {user.email}</> : 'You’re trying the demo.'}</p>
+          </div>
+          <form action={signOutAction}>
+            <SubmitButton variant="outline" pendingLabel="Signing out…">{user ? 'Sign out' : 'Leave the demo'}</SubmitButton>
+          </form>
+        </div>
+        {!business.demo && (
+          <form action={deleteBusinessAction} className="flex flex-col gap-3 border-t border-linen pt-5 text-sm">
+            <span className="font-semibold">Delete {business.name}</span>
+            <span className="text-muted">Removes every customer, invoice, message and setting for good. Download your invoices first if you need them.</span>
+            {error === 'confirm' && <span className="font-semibold text-rust">Type the business name exactly to confirm.</span>}
+            <div className="flex flex-wrap gap-2">
+              <input name="confirm" placeholder={`Type “${business.name}” to confirm`} aria-label="Business name to confirm" className={`${field} mt-0 max-w-xs`} />
+              <SubmitButton variant="danger" pendingLabel="Deleting…" confirm="Delete this business and all of its data? This can’t be undone.">Delete business</SubmitButton>
+            </div>
+          </form>
+        )}
       </Panel>
     </div>
   );

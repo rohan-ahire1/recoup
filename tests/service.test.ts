@@ -7,7 +7,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'recoup-test-'));
 process.env.DATA_DIR = dir;
 const { enterBusiness } = await import('../lib/tenant');
-enterBusiness({ businessId: 'test', demo: false });
+const accounts = await import('../lib/accounts');
+enterBusiness(accounts.tenantOf(accounts.createBusiness({ name: 'Test' })));
 
 const svc = await import('../lib/service');
 const repo = await import('../lib/repo');
