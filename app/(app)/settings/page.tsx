@@ -70,7 +70,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
         <Panel className="grid gap-4 p-6 text-sm font-semibold sm:p-7">
           <div>
-            <h2 className="display text-[22px] font-bold">How customers pay you</h2>
+            <h2 className="display text-section font-bold">How customers pay you</h2>
             <p className="font-normal text-muted">Shown on each customer’s payment page, under what they owe. Recoup never handles the money.</p>
           </div>
           <label>
