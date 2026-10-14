@@ -1,5 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import type { SendResult } from './sms';
+
+export interface SendResult {
+  provider: string;
+  providerId: string | null;
+  status: 'sent' | 'delivered' | 'failed';
+  error?: string;
+}
 
 export function resendConfigured(): boolean {
   return Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);

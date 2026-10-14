@@ -155,7 +155,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const sets = listTemplateSets();
   const ai = aiEnabled();
   const providers = providerStatus();
-  const canSendNow = s.ready ? (s.ready.channel === 'email' ? providers.email !== 'mock' : providers.sms !== 'mock') : false;
+  const canSendNow = s.ready ? s.ready.channel === 'email' && providers.email !== 'mock' : false;
   const installments = c ? listInstallments(c.id) : [];
 
   const story: StoryItem[] = [
@@ -454,7 +454,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               {isDemoMode() && c && (
                 <form action={simulatePaymentAction} className="pt-3">
                   <input type="hidden" name="customerId" value={customer.id} />
-                  <SubmitButton variant="outline" size="sm" pendingLabel="Paying…">Demo: {first} pays online</SubmitButton>
+                  <SubmitButton variant="outline" size="sm" pendingLabel="Paying…">Demo: {first} pays</SubmitButton>
                 </form>
               )}
             </div>

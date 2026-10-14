@@ -1,55 +1,34 @@
 import { NextResponse } from 'next/server';
 import { enterPayLink } from '@/lib/pay-access';
-import { createCheckoutSession } from '@/lib/providers';
-import { stripeConfigured } from '@/lib/providers/payments';
-import { getCustomerByToken, getOpenCase, listInstallments } from '@/lib/repo';
-import { choosePlan, payableCents, recordPayment } from '@/lib/service';
-import { getSettings } from '@/lib/settings';
-import type { Customer, Installment } from '@/lib/types';
+import { allow } from '@/lib/rate-limit';
+import { getCustomerByToken } from '@/lib/repo';
+import { choosePlan, reportPaymentSent } from '@/lib/service';
 
 export const dynamic = 'force-dynamic';
 
-/** Take a payment: Stripe Checkout when configured, otherwise record it straight away (test mode). */
-async function collect(req: Request, customer: Customer, amountCents: number, installment?: Installment) {
-  const pagePath = `/pay/${customer.payToken}`;
-  if (stripeConfigured()) {
-    const { businessName } = getSettings();
-    const url = await createCheckoutSession({
-      amountCents,
-      productName: installment ? `${businessName}: payment ${installment.seq}` : `${businessName}: invoice payment`,
-      successUrl: new URL(`${pagePath}?session_id={CHECKOUT_SESSION_ID}`, req.url).toString(),
-      cancelUrl: new URL(pagePath, req.url).toString(),
-      metadata: { customer_id: String(customer.id), kind: installment ? 'installment' : 'full', installment_id: installment ? String(installment.id) : undefined },
-    });
-    return NextResponse.redirect(url, 303);
-  }
-  recordPayment({ customerId: customer.id, amountCents, installmentId: installment?.id, source: 'mock', method: 'card' });
-  return NextResponse.redirect(new URL(`${pagePath}?paid=1`, req.url), 303);
-}
-
+/** The customer's choices on their payment page. Recoup never takes the money itself. */
 export async function POST(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
   enterPayLink(token);
   const customer = getCustomerByToken(token);
   if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  const back = NextResponse.redirect(new URL(`/pay/${token}`, req.url), 303);
-  const form = await req.formData();
-  const action = String(form.get('action') ?? 'full');
+  const page = (q = '') => NextResponse.redirect(new URL(`/pay/${token}${q}`, req.url), 303);
+  if (!allow(`pay:${token}`, 20, 60 * 60_000)) return page('?error=slow');
 
+  const form = await req.formData();
   try {
-    if (action === 'plan') {
-      const first = choosePlan(customer.id, Number(form.get('count'))).find((i) => !i.paidAt);
-      return first ? collect(req, customer, first.amountCents, first) : back;
+    switch (String(form.get('action'))) {
+      case 'sent':
+        reportPaymentSent(customer.id);
+        return page('?sent=1');
+      case 'plan':
+        choosePlan(customer.id, Number(form.get('count')));
+        return page('?plan=set');
+      default:
+        return page();
     }
-    const c = getOpenCase(customer.id);
-    if (c?.status === 'plan') {
-      const next = listInstallments(c.id).find((i) => !i.paidAt);
-      return next ? collect(req, customer, next.amountCents, next) : back;
-    }
-    const amount = payableCents(customer);
-    return amount > 0 ? collect(req, customer, amount) : back;
   } catch (err) {
-    console.error('Payment failed', err);
-    return NextResponse.redirect(new URL(`/pay/${token}?error=1`, req.url), 303);
+    console.error('Pay page action failed', err);
+    return page('?error=1');
   }
 }

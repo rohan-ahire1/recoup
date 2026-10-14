@@ -34,7 +34,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const { saved, error } = await searchParams;
   const s = getSettings();
   const p = providerStatus();
-  const canAuto = p.email !== 'mock' || p.sms !== 'mock';
+  const canAuto = p.email !== 'mock';
   const zones = TIMEZONES.includes(s.timezone) ? TIMEZONES : [s.timezone, ...TIMEZONES];
   const field = `mt-1 h-11 ${FIELD}`;
 
@@ -68,11 +68,34 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </label>
         </Panel>
 
+        <Panel className="grid gap-4 p-6 text-sm font-semibold sm:p-7">
+          <div>
+            <h2 className="display text-[22px] font-bold">How customers pay you</h2>
+            <p className="font-normal text-muted">Shown on each customer’s payment page, under what they owe. Recoup never handles the money.</p>
+          </div>
+          <label>
+            Payment instructions
+            <textarea
+              name="payInstructions"
+              defaultValue={s.payInstructions}
+              rows={4}
+              maxLength={2000}
+              placeholder={'Bank transfer: Ferro Service Co., routing 000000000, account 0000000\nZelle: pay@ferroservice.com\nChecks to 12 Main St, Springfield'}
+              className={`${field} h-auto py-2.5`}
+            />
+          </label>
+          <label>
+            Link to your payment page <span className="font-normal text-faint">(optional)</span>
+            <input name="payLink" defaultValue={s.payLink} placeholder="https://square.link/u/…" className={field} />
+            <span className="mt-1 block font-normal text-faint">Square, PayPal, Stripe, QuickBooks or any page where customers can pay by card.</span>
+          </label>
+        </Panel>
+
         <Panel className="flex flex-col gap-3 p-6 sm:p-7">
           <h2 className="display text-section font-bold">Sending</h2>
           {[
             { v: 'prepare', title: 'I’ll send them myself', detail: 'Recoup drafts each reminder. You open it in Gmail, Outlook, your mail app or your phone, and press send.' },
-            { v: 'auto', title: 'Send automatically', detail: canAuto ? 'Reminders go out on their own through your connected email or texting service.' : 'Connect an email or texting service below first.' },
+            { v: 'auto', title: 'Send automatically', detail: canAuto ? 'Emails go out on their own. Texts still open on your phone for you to send.' : 'Needs email sending, below.' },
           ].map((o) => (
             <label key={o.v} className={`ease flex gap-3 rounded-block px-4 py-3.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal ${o.v === 'auto' && !canAuto ? 'opacity-60' : 'cursor-pointer'}`}>
               <input type="radio" name="deliveryMode" value={o.v} defaultChecked={s.deliveryMode === o.v} disabled={o.v === 'auto' && !canAuto} className="mt-1 accent-teal" />
@@ -113,8 +136,6 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <ul className="divide-y divide-linen">
           <Connection name="Gmail or Outlook mailbox" detail="Send from your own address and see replies here automatically." status={<Chip tone="outline">Coming soon</Chip>} />
           <Connection name="Email sending (Resend)" detail="Send reminders directly, without opening your mail app." status={p.email !== 'mock' ? connected : <Chip tone="outline">RESEND_API_KEY</Chip>} />
-          <Connection name="Texting (Twilio)" detail="Send texts directly and receive replies. Needs a registered business number." status={p.sms !== 'mock' ? connected : <Chip tone="outline">TWILIO_*</Chip>} />
-          <Connection name="Online payments (Stripe)" detail="Customers pay by card on their payment page." status={p.payments !== 'mock' ? connected : <Chip tone="outline">Test mode</Chip>} />
           <Connection name="AI assistant" detail="Personalizes messages, writes templates, and reads customer replies." status={aiEnabled() ? connected : <PremiumBadge />} />
         </ul>
       </Panel>

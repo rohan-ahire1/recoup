@@ -9,7 +9,7 @@ import { isDemoMode } from '@/lib/providers';
 import { getOpenCase, getTemplateSet } from '@/lib/repo';
 import { TEMPLATE_KEYS } from '@/lib/sequence';
 import * as svc from '@/lib/service';
-import { getSettings, saveSettings, type DeliveryMode } from '@/lib/settings';
+import { cleanPayLink, getSettings, saveSettings, type DeliveryMode } from '@/lib/settings';
 import { enterBusiness } from '@/lib/tenant';
 import type { TemplateSetContent } from '@/lib/tones';
 import type { Channel, ReplyKind } from '@/lib/types';
@@ -263,6 +263,8 @@ export async function saveSettingsAction(form: FormData) {
     senderName: str(form, 'senderName'),
     timezone,
     replyToEmail: str(form, 'replyToEmail'),
+    payInstructions: str(form, 'payInstructions').slice(0, 2000),
+    payLink: cleanPayLink(str(form, 'payLink')),
     deliveryMode: (str(form, 'deliveryMode') as DeliveryMode) === 'auto' ? 'auto' : 'prepare',
   });
   refresh();

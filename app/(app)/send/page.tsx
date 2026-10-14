@@ -39,7 +39,7 @@ export default async function SendPage({ searchParams }: { searchParams: Promise
       <PageTitle
         title="To send"
         sub={
-          providers.email === 'mock' && providers.sms === 'mock'
+          providers.email === 'mock'
             ? 'Recoup drafts each reminder. Open it in your own email or messages, press send there, then mark it sent.'
             : 'Messages waiting for you. Connected channels can send straight from here.'
         }
@@ -97,7 +97,7 @@ export default async function SendPage({ searchParams }: { searchParams: Promise
                   </div>
                   <SendPanel
                     draft={{ id: m.id, channel: m.channel as 'email' | 'sms', toAddr: m.toAddr, subject: m.subject, body: m.body, label: labelOf(m) }}
-                    canSendNow={m.channel === 'email' ? providers.email !== 'mock' : providers.sms !== 'mock'}
+                    canSendNow={m.channel === 'email' && providers.email !== 'mock'}
                     aiEnabled={ai}
                     compact
                   />

@@ -2,13 +2,12 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
+import { BigMoney, buttonClass } from '@/app/components/ui';
 import { formatLongDate, formatShortDate, money, moneyShort } from '@/lib/format';
 import { enterPayLink } from '@/lib/pay-access';
-import { BigMoney } from '@/app/components/ui';
-import { providerStatus, retrieveCheckoutSession } from '@/lib/providers';
 import { getCustomerByToken, getOpenCase, listInstallments } from '@/lib/repo';
 import { PLAN_OFFER_STEP, splitInstallments } from '@/lib/sequence';
-import { payableInvoices, recordPayment } from '@/lib/service';
+import { payableInvoices } from '@/lib/service';
 import { getNow, getSettings } from '@/lib/settings';
 import { firstName } from '@/lib/templates';
 import { daysBetween, localDate } from '@/lib/time';
@@ -20,25 +19,32 @@ export async function generateMetadata({ params }: { params: Promise<{ token: st
   return { title: `Pay ${getSettings().businessName}`, robots: { index: false } };
 }
 
-/** Stripe sends people back here; confirm the session so the payment shows even if the webhook is slow. */
-async function confirmStripe(sessionId: string, customerId: number) {
-  try {
-    const s = await retrieveCheckoutSession(sessionId);
-    if (s.payment_status === 'paid' && Number(s.metadata.customer_id) === customerId) {
-      recordPayment({
-        customerId,
-        amountCents: s.amount_total,
-        installmentId: s.metadata.installment_id ? Number(s.metadata.installment_id) : null,
-        source: 'stripe',
-        method: 'card',
-        externalId: s.id,
-      });
-      return true;
-    }
-  } catch (err) {
-    console.error('Could not confirm Stripe session', err);
-  }
-  return false;
+function HowToPay({ token, amount, instructions, link, businessName, sent }: { token: string; amount: number; instructions: string; link: string; businessName: string; sent: boolean }) {
+  return (
+    <div className="mt-6 flex flex-col gap-3">
+      {link && (
+        <a href={link} target="_blank" rel="noopener noreferrer" className={`${buttonClass('primary', 'lg')} w-full`}>
+          Pay {money(amount)}
+        </a>
+      )}
+      {instructions ? (
+        <div className="rounded-block bg-linen/60 px-4 py-3.5">
+          <p className="text-sm font-semibold">How to pay {businessName.replace(/\.$/, '')}</p>
+          <p className="mt-1 text-[15px] whitespace-pre-line">{instructions}</p>
+        </div>
+      ) : (
+        !link && <p className="rounded-block bg-linen/60 px-4 py-3.5 text-[15px]">Reply to the message from {businessName.replace(/\.$/, '')} and they’ll tell you how to pay.</p>
+      )}
+      {sent ? (
+        <p className="rounded-block bg-teal-soft px-4 py-3 text-center text-sm font-semibold text-teal-strong">Thanks! We’ve let {businessName.replace(/\.$/, '')} know.</p>
+      ) : (
+        <form action={`/api/pay/${token}`} method="post">
+          <input type="hidden" name="action" value="sent" />
+          <SubmitButton variant={link ? 'outline' : 'primary'} size="lg" className="w-full">I’ve sent payment</SubmitButton>
+        </form>
+      )}
+    </div>
+  );
 }
 
 export default async function PayPage({
@@ -46,7 +52,7 @@ export default async function PayPage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ paid?: string; plan?: string; error?: string; session_id?: string }>;
+  searchParams: Promise<{ sent?: string; plan?: string; error?: string }>;
 }) {
   const { token } = await params;
   enterPayLink(token);
@@ -54,10 +60,8 @@ export default async function PayPage({
   const customer = getCustomerByToken(token);
   if (!customer) notFound();
 
-  let justPaid = query.paid === '1';
-  if (query.session_id && providerStatus().payments === 'stripe') justPaid = await confirmStripe(query.session_id, customer.id);
-
-  const { businessName, timezone } = getSettings();
+  const { businessName, timezone, payInstructions, payLink } = getSettings();
+  const sent = query.sent === '1';
   const t = localDate(getNow(), timezone);
   const first = firstName(customer);
   const c = getOpenCase(customer.id);
@@ -66,7 +70,7 @@ export default async function PayPage({
   const installments = c?.status === 'plan' ? listInstallments(c.id) : [];
   const nextInstallment = installments.find((i) => !i.paidAt);
   const planOffered = Boolean(c && c.status !== 'plan' && (c.currentStep >= PLAN_OFFER_STEP || query.plan));
-  const testMode = providerStatus().payments === 'mock';
+  const how = { token, instructions: payInstructions, link: payLink, businessName, sent };
 
   return (
     <div className="min-h-screen px-4 py-10 sm:py-16">
@@ -74,11 +78,11 @@ export default async function PayPage({
         <p className="display text-center text-heading font-bold">{businessName}</p>
 
         <div className="rounded-pay bg-paper p-6 ring-1 ring-edge ring-inset shadow-[var(--shadow-lift)] sm:p-8">
-          {query.error && <p className="mb-5 rounded-block bg-rust-soft px-4 py-3 text-sm text-rust">Something went wrong starting the payment. Please try again.</p>}
+          {query.error && <p className="mb-5 rounded-block bg-rust-soft px-4 py-3 text-sm text-rust">{query.error === 'slow' ? 'Too many tries. Please wait a little and try again.' : 'Something went wrong. Please try again.'}</p>}
 
           {nextInstallment ? (
             <>
-              {justPaid && <p className="mb-5 rounded-block bg-teal-soft px-4 py-3 text-sm font-semibold text-teal-strong">Payment received. Thank you, {first}!</p>}
+              {query.plan === 'set' && <p className="mb-5 rounded-block bg-teal-soft px-4 py-3 text-sm font-semibold text-teal-strong">Your plan is set, {first}. Thank you!</p>}
               <p className="text-muted">Your payment plan</p>
               <BigMoney value={moneyShort(nextInstallment.amountCents)} className="mt-1" />
               <p className="mt-2 text-muted">
@@ -95,18 +99,15 @@ export default async function PayPage({
                   </li>
                 ))}
               </ul>
-              <form action={`/api/pay/${token}`} method="post" className="mt-6">
-                <input type="hidden" name="action" value="installment" />
-                <SubmitButton variant="primary" size="lg" className="w-full">Pay {money(nextInstallment.amountCents)}</SubmitButton>
-              </form>
+              <HowToPay {...how} amount={nextInstallment.amountCents} />
             </>
           ) : total === 0 ? (
             <div className="py-4 text-center">
               <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-teal-soft text-teal">
                 <Icon name="check" size={28} />
               </span>
-              <h1 className="display mt-5 text-heading font-bold">{justPaid ? `Thank you, ${first}!` : 'You’re all paid up'}</h1>
-              <p className="mt-2 text-muted">{justPaid ? `Your payment to ${businessName} went through.` : 'There’s nothing to pay right now.'}</p>
+              <h1 className="display mt-5 text-heading font-bold">You’re all paid up</h1>
+              <p className="mt-2 text-muted">There’s nothing to pay right now.</p>
             </div>
           ) : (
             <>
@@ -125,15 +126,12 @@ export default async function PayPage({
                   </li>
                 ))}
               </ul>
-              <form action={`/api/pay/${token}`} method="post" className="mt-6">
-                <input type="hidden" name="action" value="full" />
-                <SubmitButton variant="primary" size="lg" className="w-full">Pay {money(total)}</SubmitButton>
-              </form>
+              <HowToPay {...how} amount={total} />
 
               {planOffered && (
                 <div id="plan" className="mt-8 border-t border-linen pt-6">
                   <h2 className="display text-section font-bold">Or split it up</h2>
-                  <p className="mt-1 text-muted">Pay part today and the rest every two weeks. No fees.</p>
+                  <p className="mt-1 text-muted">Pay part now and the rest every two weeks. No fees.</p>
                   <div className="mt-4 flex flex-col gap-2">
                     {[2, 3].map((count) => {
                       const parts = splitInstallments(total, count);
@@ -144,7 +142,7 @@ export default async function PayPage({
                           <button type="submit" className="ease flex w-full items-center justify-between gap-4 rounded-block px-4 py-3.5 text-left ring-1 ring-line ring-inset hover:bg-linen/60 hover:ring-linen-2">
                             <span className="font-semibold">{count} payments</span>
                             <span className="num text-right text-muted">
-                              <span className="font-semibold text-ink">{money(parts[0])}</span> today
+                              <span className="font-semibold text-ink">{money(parts[0])}</span> now
                               <span className="block text-xs">then {count - 1} more, every 2 weeks</span>
                             </span>
                           </button>
@@ -159,7 +157,6 @@ export default async function PayPage({
         </div>
 
         <p className="text-center text-sm text-muted">Questions? Just reply to the message from {businessName.replace(/\.$/, '')}.</p>
-        {testMode && <p className="-mt-3 text-center text-xs text-faint">Test mode: no card will be charged.</p>}
       </main>
     </div>
   );

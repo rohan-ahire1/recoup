@@ -9,7 +9,7 @@ Small businesses write off $100–$2,000 invoices because chasing them isn't wor
 - **Customers, not just invoices.** Businesses and individuals, with contacts, tags, and notes. Each customer page tells the whole story: every invoice, message, reply, promise, and payment.
 - **Payment track record.** Import paid invoices too, and Recoup works out whether this is a first slip or a pattern: *"Dana usually pays. Just a little late, now and then."*
 - **Tones.** Friendly, Professional, Concise, and Firm, each written for every step by email and text. Pick one per customer, or leave it on **Auto**: Friendly for good payers, Firm for chronic late ones. You can duplicate any tone and write your own version.
-- **Send it your way.** Recoup drafts each reminder into **To send**. Open it prefilled in Gmail, Outlook, or your mail app, open it as a text on your phone, or copy it, then mark it sent. Connect Resend or Twilio to send directly or automatically.
+- **Send it your way.** Recoup drafts each reminder into **To send**. Open it prefilled in Gmail, Outlook, or your mail app, open it as a text on your phone, or copy it, then mark it sent. With email sending on, reminders can go out directly or automatically.
 - **Replies that do something.** Log what a customer said: a promise pauses reminders until the date, a dispute stops them, "already paid" flags it for you, and "can I pay in parts" prepares a plan offer.
 - **Payment page** in your business's name: pay everything, or split it into 2 or 3 payments two weeks apart.
 - **Tracking.** Today view, filters (status, type, pattern, amount, age, tag) with saved views, aging, recovered by month, recovery rate by tone, customer type, and payment pattern, plus CSV export.
@@ -53,12 +53,11 @@ With no keys set, it runs in **demo mode**. Nothing is really sent, payment page
 | --- | --- | --- |
 | AI features | `ANTHROPIC_API_KEY` | Uses Claude Opus 5, with the server-side refusal fallback. |
 | Email sending (Resend) | `RESEND_API_KEY`, `EMAIL_FROM` | Enables **Send now**, and **Send automatically** in Settings. |
-| Texting (Twilio) | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER` | Incoming webhook: `POST /api/webhooks/twilio` (signature verified; STOP/START handled). |
-| Payments (Stripe) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | `checkout.session.completed` and `checkout.session.async_payment_succeeded` go to `POST /api/webhooks/stripe`. |
-| Links | `PUBLIC_BASE_URL` | Used in payment links. |
+| Links | `PUBLIC_BASE_URL` | Used in payment links and sign-in emails. |
+| Sign-in emails | `AUTH_EMAIL_FROM` | Sender for sign-in links (with `RESEND_API_KEY`). |
 | Scheduler | `CRON_SECRET` | Call `POST /api/cron/run` every 15 minutes (`Authorization: Bearer …`). |
 
-Demo controls switch off as soon as email or texting is connected. Set `DEMO_MODE=1` or `DEMO_MODE=0` to override that.
+Demo controls only exist in demo workspaces ("Try the demo" on the home page). They never send real email and are deleted after 3 days.
 
 ## Project layout
 
@@ -80,13 +79,12 @@ PRODUCT.md, DESIGN.md   Product truth and the "Front desk" design system
 
 *Not legal advice.*
 
-- **Texts:** automated texts need prior consent (TCPA). STOP always works. US business texting needs 10DLC registration through Twilio, which takes days to weeks.
+- **Texts:** automated texts need prior consent (TCPA). STOP always works. Recoup never sends texts itself: they open on the business's own phone.
 - **FDCPA:** it mostly governs third-party collectors. Recoup sends everything in the business's own name. Running it as a service that collects *for* other businesses changes that. State laws vary.
 - **Tone:** built-in templates never threaten or mention agencies, credit, or legal action. The AI is instructed the same way.
 
 ## Known gaps
 
-- One business per install; there's no login yet.
-- Gmail/Outlook mailbox sync is designed but not built. Replies are logged by hand, or arrive via the Twilio webhook for texts.
+- Gmail/Outlook mailbox sync is designed but not built. Replies are logged by hand.
 - Missed plan installments aren't chased yet.
 - SQLite fits a single server; swap `lib/db.ts` for Postgres for multi-instance hosting.
