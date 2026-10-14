@@ -1,6 +1,8 @@
 import { ImportForm } from '@/app/components/ImportForm';
-import { PageTitle, Panel } from '@/app/components/ui';
+import { buttonClass, PageTitle, Panel } from '@/app/components/ui';
+import { getQuickBooks } from '@/lib/accounts';
 import { requireBusiness } from '@/lib/auth';
+import { quickBooksConfigured } from '@/lib/quickbooks';
 import { STEPS } from '@/lib/sequence';
 import { enterBusiness } from '@/lib/tenant';
 
@@ -17,12 +19,24 @@ const COLUMNS: [string, string][] = [
   ['Contact, Description, Tags', 'Optional extras'],
 ];
 
-export default async function ImportPage() {
-  enterBusiness(await requireBusiness());
+export default async function ImportPage({ searchParams }: { searchParams: Promise<{ qb?: string }> }) {
+  const { business } = enterBusiness(await requireBusiness());
+  const { qb } = await searchParams;
+  const offerQb = !business.demo && quickBooksConfigured() && !getQuickBooks(business.id);
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="min-w-0">
         <PageTitle title="Import invoices" sub="Include paid invoices too. Recoup learns how each customer usually pays and picks the right tone." />
+        {offerQb && (
+          <Panel className="mb-6 flex flex-wrap items-center justify-between gap-4 p-6">
+            <div className="min-w-0">
+              <h2 className="font-semibold">Use QuickBooks Online?</h2>
+              <p className="text-sm text-muted">Connect it instead of uploading a file. Invoices stay in sync, and payments you record there stop the reminders.</p>
+              {qb && qb !== 'connected' && <p className="mt-1 text-sm font-semibold text-rust">That didn’t work. Please try again, or upload a file below.</p>}
+            </div>
+            <a href="/api/quickbooks/connect?from=import" className={buttonClass('primary')}>Connect QuickBooks</a>
+          </Panel>
+        )}
         <ImportForm />
       </div>
       <aside className="flex flex-col gap-5">

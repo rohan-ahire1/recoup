@@ -55,6 +55,7 @@ With no keys set, it runs in **demo mode**. Nothing is really sent, payment page
 | Email sending (Resend) | `RESEND_API_KEY`, `EMAIL_FROM` | One shared sender for every business: "Harbor Bakery via Recoup <`EMAIL_FROM`>", replies to the business. Enables **Send now** and **Send automatically**. A business can verify its own domain in Settings. |
 | Bounces and complaints | `RESEND_WEBHOOK_SECRET` | Point a Resend webhook (`email.bounced`, `email.complained`) at `/api/webhooks/resend`. Bounces flag the customer; too many pause that business's automatic email. |
 | Daily cap | `EMAIL_DAILY_CAP` | Automatic emails per business per day. Default 200. |
+| QuickBooks Online | `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`, `QUICKBOOKS_ENVIRONMENT`, `TOKEN_ENCRYPTION_KEY` | Read-only. Register `/api/quickbooks/callback` as the redirect URI and `/api/quickbooks/disconnected` as the disconnect URL. Syncs on connect, then hourly from the scheduler; a payment in QuickBooks stops reminders. Tokens are encrypted with `TOKEN_ENCRYPTION_KEY`. |
 | Links | `PUBLIC_BASE_URL` | Used in payment links and sign-in emails. |
 | Sign-in emails | `AUTH_EMAIL_FROM` | Sender address for sign-in links (with `RESEND_API_KEY`). Required in production. |
 | Scheduler | `CRON_SECRET` | Call `POST /api/cron/run` every 15 minutes (`Authorization: Bearer …`). |
@@ -70,6 +71,8 @@ lib/history.ts    Track record and plain-English summaries
 lib/tones.ts      The four built-in tones
 lib/compose.ts    Gmail / Outlook / mailto / sms links
 lib/ai.ts         Premium AI features (Anthropic SDK)
+lib/quickbooks.ts QuickBooks Online sign-in and invoice sync
+lib/email.ts      Reminder sender, daily cap, bounces and complaints, own domains
 lib/sample.ts     Demo business, replayed through the real engine
 app/(app)/        Today, Customers, Invoices, To send, Templates, Reports, Settings, Import
 app/pay/[token]/  Customer-facing payment page

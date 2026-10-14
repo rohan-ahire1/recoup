@@ -1,10 +1,20 @@
 import { deleteBusinessAction, signOutAction } from '@/app/account-actions';
-import { addEmailDomainAction, checkEmailDomainAction, removeEmailDomainAction, saveSettingsAction, toggleDemoBarAction } from '@/app/actions';
+import {
+  addEmailDomainAction,
+  checkEmailDomainAction,
+  disconnectQuickBooksAction,
+  removeEmailDomainAction,
+  saveSettingsAction,
+  syncQuickBooksAction,
+  toggleDemoBarAction,
+} from '@/app/actions';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { Chip, FIELD, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
+import { buttonClass, Chip, FIELD, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
 import { aiEnabled } from '@/lib/ai';
-import { getEmailDomain, getUser } from '@/lib/accounts';
+import { getEmailDomain, getQuickBooks, getUser } from '@/lib/accounts';
 import { dailyCap, senderFor } from '@/lib/email';
+import { relativeTime } from '@/lib/format';
+import { quickBooksConfigured } from '@/lib/quickbooks';
 import { requireBusiness, requireSession } from '@/lib/auth';
 import { isDemoMode, providerStatus } from '@/lib/providers';
 import { getSettings } from '@/lib/settings';
@@ -14,9 +24,19 @@ export const dynamic = 'force-dynamic';
 
 const TIMEZONES = ['America/New_York', 'America/Chicago', 'America/Denver', 'America/Phoenix', 'America/Los_Angeles', 'America/Anchorage', 'Pacific/Honolulu'];
 
-function Connection({ name, detail, status }: { name: string; detail: string; status: React.ReactNode }) {
+const QB_NOTICES: Record<string, { tone: 'teal' | 'rust'; text: string }> = {
+  connected: { tone: 'teal', text: 'QuickBooks is connected and your invoices are in.' },
+  synced: { tone: 'teal', text: 'Synced with QuickBooks.' },
+  syncfailed: { tone: 'rust', text: 'Couldn’t sync with QuickBooks just now. We’ll keep trying every hour.' },
+  failed: { tone: 'rust', text: 'Connecting QuickBooks didn’t work. Please try again.' },
+  cancelled: { tone: 'rust', text: 'QuickBooks wasn’t connected.' },
+  disconnected: { tone: 'rust', text: 'Recoup was disconnected from QuickBooks. Connect again to keep invoices in sync.' },
+  removed: { tone: 'teal', text: 'QuickBooks is disconnected. Invoices already here stay.' },
+};
+
+function Connection({ id, name, detail, status }: { id?: string; name: string; detail: React.ReactNode; status: React.ReactNode }) {
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 py-4">
+    <li id={id} className="flex scroll-mt-24 flex-wrap items-center justify-between gap-3 py-4">
       <div className="min-w-0">
         <div className="font-semibold">{name}</div>
         <div className="text-sm text-muted">{detail}</div>
@@ -28,16 +48,50 @@ function Connection({ name, detail, status }: { name: string; detail: string; st
 
 const connected = <span className="rounded-full bg-teal-soft px-3 py-1 text-sm font-semibold text-teal-strong">Connected</span>;
 
-export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string; domainError?: string; checked?: string }> }) {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string; error?: string; domainError?: string; checked?: string; qb?: string }>;
+}) {
   const { business } = enterBusiness(await requireBusiness());
   const session = await requireSession();
   const user = session.userId ? getUser(session.userId) : undefined;
-  const { saved, error, domainError, checked } = await searchParams;
+  const { saved, error, domainError, checked, qb } = await searchParams;
   const s = getSettings();
   const p = providerStatus();
   const canAuto = p.email !== 'mock';
   const sender = senderFor(business.id, s);
   const domain = getEmailDomain(business.id);
+  const qbo = getQuickBooks(business.id);
+  const qbNotice = qb ? QB_NOTICES[qb] : undefined;
+  const connectQb = (
+    <a href="/api/quickbooks/connect" className={buttonClass('outline', 'sm')}>
+      {qbo ? 'Connect again' : 'Connect'}
+    </a>
+  );
+  let qbStatus: React.ReactNode;
+  if (business.demo) qbStatus = <Chip tone="outline">Off in the demo</Chip>;
+  else if (!quickBooksConfigured()) qbStatus = <Chip tone="outline">Not set up yet</Chip>;
+  else if (!qbo || qbo.lastError === 'disconnected') qbStatus = connectQb;
+  else
+    qbStatus = (
+      <div className="flex flex-wrap gap-2">
+        <form action={syncQuickBooksAction}>
+          <SubmitButton variant="outline" size="sm" pendingLabel="Syncing…">Sync now</SubmitButton>
+        </form>
+        <form action={disconnectQuickBooksAction}>
+          <SubmitButton variant="quiet" size="sm" pendingLabel="Disconnecting…" confirm="Disconnect QuickBooks? Invoices already in Recoup stay, but payments in QuickBooks won’t stop reminders any more.">
+            Disconnect
+          </SubmitButton>
+        </form>
+      </div>
+    );
+  const now = Date.now();
+  const qbDetail = !qbo
+    ? 'Bring in customers and invoices automatically. A payment recorded in QuickBooks stops the reminders.'
+    : qbo.lastError === 'disconnected'
+      ? 'Disconnected. Connect again to keep invoices in sync.'
+      : `${qbo.companyName ?? 'Connected'}${qbo.lastSyncAt ? ` · synced ${relativeTime(qbo.lastSyncAt, now)}` : ''}${qbo.lastError ? ' · last sync failed' : ''}`;
   const zones = TIMEZONES.includes(s.timezone) ? TIMEZONES : [s.timezone, ...TIMEZONES];
   const field = `mt-1 h-11 ${FIELD}`;
 
@@ -218,8 +272,10 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <Panel className="mt-8 p-6 sm:p-7">
         <h2 className="display text-section font-bold">Connections</h2>
-        <p className="text-sm text-muted">Set these up on the server (see the README). Everything works without them.</p>
+        <p className="text-sm text-muted">Everything works without them.</p>
+        {qbNotice && <p className={`mt-3 text-sm font-semibold ${qbNotice.tone === 'teal' ? 'text-teal' : 'text-rust'}`}>{qbNotice.text}</p>}
         <ul className="divide-y divide-linen">
+          <Connection id="quickbooks" name="QuickBooks Online" detail={qbDetail} status={qbStatus} />
           <Connection name="Gmail or Outlook mailbox" detail="Send from your own address and see replies here automatically." status={<Chip tone="outline">Coming soon</Chip>} />
           <Connection name="Email sending" detail="Send reminders directly, without opening your mail app." status={p.email !== 'mock' ? connected : <Chip tone="outline">{isDemoMode() ? 'Off in the demo' : 'Not set up yet'}</Chip>} />
           <Connection name="AI assistant" detail="Personalizes messages, writes templates, and reads customer replies." status={aiEnabled() ? connected : <PremiumBadge />} />

@@ -88,6 +88,21 @@ CREATE TABLE sent_emails (
 );
 CREATE INDEX sent_emails_business ON sent_emails(business_id, sent_at);
 `,
+  `
+-- A business's QuickBooks Online company. Tokens are encrypted (lib/secret-box.ts).
+CREATE TABLE quickbooks_connections (
+  business_id TEXT PRIMARY KEY REFERENCES businesses(id) ON DELETE CASCADE,
+  realm_id TEXT NOT NULL,
+  company_name TEXT,
+  access_token TEXT NOT NULL,
+  access_expires_at INTEGER NOT NULL,
+  refresh_token TEXT NOT NULL,
+  refresh_expires_at INTEGER NOT NULL,
+  connected_at INTEGER NOT NULL,
+  last_sync_at INTEGER,
+  last_error TEXT
+);
+`,
 ];
 
 const MINUTE = 60_000;
@@ -327,6 +342,66 @@ export function pauseBusinessEmail(businessId: string, reason: string, now = Dat
 
 export function resumeBusinessEmail(businessId: string) {
   adb().prepare('UPDATE businesses SET email_paused_at = NULL, email_paused_reason = NULL WHERE id = ?').run(businessId);
+}
+
+// ---------------------------------------------------------------- QuickBooks
+
+export interface QuickBooksConnection {
+  businessId: string;
+  realmId: string;
+  companyName: string | null;
+  /** Encrypted. */
+  accessToken: string;
+  accessExpiresAt: number;
+  /** Encrypted. */
+  refreshToken: string;
+  refreshExpiresAt: number;
+  connectedAt: number;
+  lastSyncAt: number | null;
+  lastError: string | null;
+}
+
+const QB_COLS = `business_id AS businessId, realm_id AS realmId, company_name AS companyName, access_token AS accessToken,
+  access_expires_at AS accessExpiresAt, refresh_token AS refreshToken, refresh_expires_at AS refreshExpiresAt,
+  connected_at AS connectedAt, last_sync_at AS lastSyncAt, last_error AS lastError`;
+
+export function getQuickBooks(businessId: string): QuickBooksConnection | undefined {
+  return adb().prepare(`SELECT ${QB_COLS} FROM quickbooks_connections WHERE business_id = ?`).get(businessId) as QuickBooksConnection | undefined;
+}
+
+/** Live businesses connected to QuickBooks, for the scheduler. */
+export function listQuickBooks(): QuickBooksConnection[] {
+  return adb()
+    .prepare(`SELECT ${QB_COLS} FROM quickbooks_connections q JOIN businesses b ON b.id = q.business_id WHERE b.demo = 0`)
+    .all() as unknown as QuickBooksConnection[];
+}
+
+export function saveQuickBooks(c: Omit<QuickBooksConnection, 'lastSyncAt' | 'lastError'>) {
+  adb()
+    .prepare(
+      `INSERT INTO quickbooks_connections (business_id, realm_id, company_name, access_token, access_expires_at, refresh_token, refresh_expires_at, connected_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(business_id) DO UPDATE SET realm_id = excluded.realm_id, company_name = excluded.company_name, access_token = excluded.access_token,
+         access_expires_at = excluded.access_expires_at, refresh_token = excluded.refresh_token, refresh_expires_at = excluded.refresh_expires_at,
+         connected_at = excluded.connected_at, last_error = NULL,
+         last_sync_at = CASE WHEN quickbooks_connections.realm_id = excluded.realm_id THEN quickbooks_connections.last_sync_at END`,
+    )
+    .run(c.businessId, c.realmId, c.companyName, c.accessToken, c.accessExpiresAt, c.refreshToken, c.refreshExpiresAt, c.connectedAt);
+}
+
+export function updateQuickBooks(
+  businessId: string,
+  fields: Partial<Record<'company_name' | 'access_token' | 'access_expires_at' | 'refresh_token' | 'refresh_expires_at' | 'last_sync_at' | 'last_error', string | number | null>>,
+) {
+  const cols = Object.keys(fields) as (keyof typeof fields)[];
+  if (!cols.length) return;
+  adb()
+    .prepare(`UPDATE quickbooks_connections SET ${cols.map((c) => `${c} = ?`).join(', ')} WHERE business_id = ?`)
+    .run(...cols.map((c) => fields[c] ?? null), businessId);
+}
+
+export function removeQuickBooks(businessId: string) {
+  adb().prepare('DELETE FROM quickbooks_connections WHERE business_id = ?').run(businessId);
 }
 
 // ---------------------------------------------------------------- housekeeping

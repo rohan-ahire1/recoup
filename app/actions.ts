@@ -6,6 +6,7 @@ import { renameBusiness } from '@/lib/accounts';
 import { requireBusiness } from '@/lib/auth';
 import { normalizeEmail, normalizePhone, parseAmount } from '@/lib/csv';
 import { addOwnDomain, checkOwnDomain, removeOwnDomain } from '@/lib/email';
+import { disconnectQuickBooks, syncQuickBooks } from '@/lib/quickbooks';
 import { isDemoMode } from '@/lib/providers';
 import { getOpenCase, getTemplateSet } from '@/lib/repo';
 import { TEMPLATE_KEYS } from '@/lib/sequence';
@@ -273,6 +274,27 @@ export async function saveSettingsAction(form: FormData) {
   });
   refresh();
   redirect(needsAddress ? '/settings?error=address' : '/settings?saved=1');
+}
+
+// ---------------------------------------------------------------- QuickBooks
+
+export async function syncQuickBooksAction() {
+  enterBusiness(await requireBusiness());
+  let result = 'synced';
+  try {
+    await syncQuickBooks();
+  } catch {
+    result = 'syncfailed';
+  }
+  refresh();
+  redirect(`/settings?qb=${result}#quickbooks`);
+}
+
+export async function disconnectQuickBooksAction() {
+  const { businessId } = enterBusiness(await requireBusiness());
+  await disconnectQuickBooks(businessId);
+  refresh();
+  redirect('/settings?qb=removed#quickbooks');
 }
 
 // ---------------------------------------------------------------- own email domain

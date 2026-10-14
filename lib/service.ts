@@ -99,6 +99,55 @@ export function previewImport(text: string, now = getNow()) {
   };
 }
 
+interface IncomingCustomer {
+  name: string;
+  type: 'business' | 'individual';
+  contactName: string | null;
+  email: string | null;
+  phone: string | null;
+  tags: string[];
+  qbId?: string;
+}
+
+/** Find the customer an import or sync means, or add them. Fills gaps but never overwrites what the owner set. */
+function ensureCustomer(c: IncomingCustomer, addedNote: string, now: number): Customer {
+  let customer =
+    (c.qbId ? findCustomerByQbId(c.qbId) : undefined) ?? findCustomer({ name: c.name, email: c.email, phone: c.phone });
+  if (!customer) {
+    const payToken = token();
+    const id = run(
+      `INSERT INTO customers (name, type, contact_name, email, phone, preferred_channel, tags, pay_token, qb_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      c.name,
+      c.type,
+      c.contactName,
+      c.email,
+      c.phone,
+      c.email ? 'email' : 'sms',
+      JSON.stringify(c.tags),
+      payToken,
+      c.qbId ?? null,
+      now,
+    ).id;
+    registerPayToken(payToken, currentTenant().businessId);
+    logEvent(id, null, 'customer_added', addedNote, now);
+    return getCustomer(id)!;
+  }
+  const fill: Record<string, string | null> = {};
+  if (!customer.email && c.email) fill.email = c.email;
+  if (!customer.phone && c.phone) fill.phone = c.phone;
+  if (!customer.contactName && c.contactName) fill.contact_name = c.contactName;
+  if (c.tags.length) fill.tags = JSON.stringify([...new Set([...customer.tags, ...c.tags])]);
+  if (c.qbId && !findCustomerByQbId(c.qbId)) fill.qb_id = c.qbId;
+  updateCustomer(customer.id, fill);
+  return getCustomer(customer.id)!;
+}
+
+const findCustomerByQbId = (qbId: string) => {
+  const r = get<{ id: number }>('SELECT id FROM customers WHERE qb_id = ?', qbId);
+  return r ? getCustomer(r.id) : undefined;
+};
+
 export async function importCsv(text: string, now = getNow()) {
   const preview = previewImport(text, now);
   if (preview.missingColumns.length) return { imported: 0, customers: 0, skipped: [], missingColumns: preview.missingColumns };
@@ -117,34 +166,11 @@ export async function importCsv(text: string, now = getNow()) {
         skipped.push({ line: row.line, reason: `Invoice #${inv.invoiceNumber} was already imported` });
         continue;
       }
-      let customer = findCustomer({ name: inv.customerName, email: inv.email, phone: inv.phone });
-      if (!customer) {
-        const payToken = token();
-        const id = run(
-          `INSERT INTO customers (name, type, contact_name, email, phone, preferred_channel, tags, pay_token, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          inv.customerName,
-          inv.customerType ?? 'individual',
-          inv.contactName,
-          inv.email,
-          inv.phone,
-          inv.email ? 'email' : 'sms',
-          JSON.stringify(inv.tags),
-          payToken,
-          now,
-        ).id;
-        registerPayToken(payToken, currentTenant().businessId);
-        customer = getCustomer(id)!;
-        logEvent(id, null, 'customer_added', 'Added from an import', now);
-      } else {
-        // Fill in anything we didn't know before; never overwrite what the owner set.
-        const fill: Record<string, string | null> = {};
-        if (!customer.email && inv.email) fill.email = inv.email;
-        if (!customer.phone && inv.phone) fill.phone = inv.phone;
-        if (!customer.contactName && inv.contactName) fill.contact_name = inv.contactName;
-        if (inv.tags.length) fill.tags = JSON.stringify([...new Set([...customer.tags, ...inv.tags])]);
-        updateCustomer(customer.id, fill);
-      }
+      const customer = ensureCustomer(
+        { name: inv.customerName, type: inv.customerType ?? 'individual', contactName: inv.contactName, email: inv.email, phone: inv.phone, tags: inv.tags },
+        'Added from an import',
+        now,
+      );
       run(
         `INSERT INTO invoices (customer_id, number, description, amount_cents, amount_paid_cents, issued_date, due_date, status, paid_date, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -167,6 +193,88 @@ export async function importCsv(text: string, now = getNow()) {
   });
   await runDueActions(now);
   return { imported, customers: touched.size, skipped, missingColumns: [] as string[] };
+}
+
+// =================================================================== QuickBooks
+
+export interface SyncedInvoice {
+  qbId: string;
+  number: string;
+  description: string | null;
+  amountCents: number;
+  /** How much QuickBooks says has been paid. */
+  paidCents: number;
+  issuedDate: string | null;
+  dueDate: string;
+  /** When it was paid in full, if it was. */
+  paidDate: string | null;
+  customer: IncomingCustomer & { qbId: string };
+}
+
+/**
+ * Bring QuickBooks invoices in, or bring existing ones up to date. A payment
+ * recorded in QuickBooks closes the matching case and stops reminders. Recoup
+ * never writes back to QuickBooks.
+ */
+export async function syncInvoices(rows: SyncedInvoice[], now = getNow()) {
+  const counts = { added: 0, updated: 0, paid: 0 };
+  const payments: { customerId: number; invoiceId: number; cents: number; key: string }[] = [];
+  tx(() => {
+    for (const r of rows) {
+      const linked = get<{ id: number }>('SELECT id FROM invoices WHERE qb_id = ?', r.qbId);
+      // An invoice imported from a spreadsheet before QuickBooks was connected gets linked by its number.
+      const existing = linked ?? get<{ id: number }>('SELECT id FROM invoices WHERE number = ? COLLATE NOCASE AND qb_id IS NULL', r.number);
+      const inv = existing && getInvoice(existing.id);
+      if (!inv) {
+        if (r.amountCents <= 0) continue; // voided or empty
+        const customer = ensureCustomer(r.customer, 'Added from QuickBooks', now);
+        const paid = r.paidCents >= r.amountCents;
+        run(
+          `INSERT INTO invoices (customer_id, number, description, amount_cents, amount_paid_cents, issued_date, due_date, status, paid_date, qb_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          customer.id,
+          r.number,
+          r.description,
+          r.amountCents,
+          Math.min(r.paidCents, r.amountCents),
+          r.issuedDate,
+          r.dueDate,
+          paid ? 'paid' : 'open',
+          paid ? (r.paidDate ?? today(now)) : null,
+          r.qbId,
+          now,
+          now,
+        );
+        counts.added++;
+        continue;
+      }
+      if (r.amountCents <= 0 && inv.status === 'open') {
+        updateInvoice(inv.id, { status: 'written_off', qb_id: r.qbId }, now);
+        logEvent(inv.customerId, inv.caseId, 'written_off', `Invoice #${inv.number} was voided in QuickBooks`, now);
+        counts.updated++;
+        continue;
+      }
+      const fields: Record<string, string | number | null> = {};
+      if (!linked) fields.qb_id = r.qbId;
+      if (inv.status === 'open') {
+        if (r.amountCents !== inv.amountCents) fields.amount_cents = r.amountCents;
+        if (r.dueDate !== inv.dueDate) fields.due_date = r.dueDate;
+      }
+      if (Object.keys(fields).length) {
+        updateInvoice(inv.id, fields, now);
+        counts.updated++;
+      }
+      // Only money Recoup doesn't know about yet. A payment the owner already recorded here isn't counted twice.
+      const newCents = Math.min(r.paidCents, r.amountCents) - inv.amountPaidCents;
+      if (inv.status === 'open' && newCents > 0) payments.push({ customerId: inv.customerId, invoiceId: inv.id, cents: newCents, key: `qb:${r.qbId}:${r.paidCents}` });
+    }
+  });
+  for (const p of payments) {
+    const r = recordPayment({ customerId: p.customerId, amountCents: p.cents, source: 'quickbooks', invoiceId: p.invoiceId, externalId: p.key, now });
+    if (!r.duplicate) counts.paid++;
+  }
+  await runDueActions(now);
+  return counts;
 }
 
 // =================================================================== tone
@@ -603,7 +711,7 @@ export function recordPayment(opts: {
     }
     if (opts.installmentId) run('UPDATE installments SET paid_at = ? WHERE id = ?', now, opts.installmentId);
 
-    const via: Record<string, string> = { manual: 'recorded by you', demo: 'simulated' };
+    const via: Record<string, string> = { manual: 'recorded by you', demo: 'simulated', quickbooks: 'in QuickBooks' };
     const stillOverdue = c ? caseInvoices(customer.id, c.id).reduce((s, i) => s + owed(i), 0) : 0;
     logEvent(customer.id, c?.id ?? null, 'payment', `Paid ${money(opts.amountCents)} ${via[opts.source] ?? opts.source}${stillOverdue ? `. ${money(stillOverdue)} still overdue.` : '. All caught up.'}`, now);
     if (c && stillOverdue === 0) {

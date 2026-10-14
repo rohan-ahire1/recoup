@@ -18,6 +18,7 @@ import {
 import { clearSessionCookie, currentSession, requireBusiness, requireSession, setSessionCookie } from '@/lib/auth';
 import { normalizeEmail } from '@/lib/csv';
 import { removeOwnDomain } from '@/lib/email';
+import { disconnectQuickBooks } from '@/lib/quickbooks';
 import { sendLoginEmail } from '@/lib/mailer';
 import { allow } from '@/lib/rate-limit';
 import { saveSettings } from '@/lib/settings';
@@ -105,6 +106,7 @@ export async function deleteBusinessAction(form: FormData) {
   const { business } = enterBusiness(await requireBusiness());
   if (str(form, 'confirm').toLowerCase() !== business.name.toLowerCase()) redirect('/settings?error=confirm');
   await removeOwnDomain(business.id);
+  await disconnectQuickBooks(business.id);
   deleteBusiness(business.id);
   const s = await currentSession();
   if (s) deleteSession(s.token);

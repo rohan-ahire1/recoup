@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { cleanUp, listLiveBusinesses, tenantOf } from '@/lib/accounts';
+import { cleanUp, getQuickBooks, listLiveBusinesses, tenantOf } from '@/lib/accounts';
+import { syncDue, syncQuickBooks } from '@/lib/quickbooks';
 import { runDueActions } from '@/lib/service';
 import { runAsBusiness } from '@/lib/tenant';
 
@@ -11,9 +12,20 @@ async function handle(req: Request) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  const totals = { businesses: 0, prepared: 0, sent: 0, failed: 0, errors: 0, demosRemoved: cleanUp() };
+  const totals = { businesses: 0, prepared: 0, sent: 0, failed: 0, synced: 0, syncErrors: 0, errors: 0, demosRemoved: cleanUp() };
   for (const b of listLiveBusinesses()) {
     totals.businesses++;
+    // Pull QuickBooks first, so invoices paid there don't get one more reminder.
+    const qb = getQuickBooks(b.id);
+    if (qb && syncDue(qb)) {
+      try {
+        await runAsBusiness(tenantOf(b), () => syncQuickBooks());
+        totals.synced++;
+      } catch (err) {
+        totals.syncErrors++;
+        console.error(`QuickBooks sync failed for business ${b.id}`, err);
+      }
+    }
     try {
       const r = await runAsBusiness(tenantOf(b), () => runDueActions());
       totals.prepared += r.prepared;

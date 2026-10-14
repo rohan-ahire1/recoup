@@ -52,7 +52,7 @@ describe('one database per business', () => {
 
   it('records the schema version', () => {
     runAsBusiness(A, () => {
-      expect(db().prepare('PRAGMA user_version').get()).toEqual({ user_version: 1 });
+      expect(db().prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 });
     });
   });
 

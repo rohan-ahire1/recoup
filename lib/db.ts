@@ -139,7 +139,16 @@ CREATE INDEX IF NOT EXISTS events_customer ON events(customer_id);
  * Schema changes go here, one entry per version, never edited once shipped.
  * Each database records how far it got in PRAGMA user_version.
  */
-const MIGRATIONS: string[] = [SCHEMA];
+const MIGRATIONS: string[] = [
+  SCHEMA,
+  `
+-- Ids of records synced from QuickBooks, so later syncs update rather than duplicate.
+ALTER TABLE customers ADD COLUMN qb_id TEXT;
+ALTER TABLE invoices ADD COLUMN qb_id TEXT;
+CREATE UNIQUE INDEX customers_qb ON customers(qb_id) WHERE qb_id IS NOT NULL;
+CREATE UNIQUE INDEX invoices_qb ON invoices(qb_id) WHERE qb_id IS NOT NULL;
+`,
+];
 
 export function migrate(d: DatabaseSync, migrations: string[]) {
   const current = Number((d.prepare('PRAGMA user_version').get() as { user_version: number }).user_version);
