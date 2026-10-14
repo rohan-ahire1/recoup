@@ -20,10 +20,10 @@ export const metadata: Metadata = {
 };
 
 const TRADES = [
-  { img: florist, label: 'Florists', note: 'Event orders paid “after the wedding”', alt: 'A florist working behind the counter of a plant-filled shop' },
-  { img: salon, label: 'Salons', note: 'Regulars who run a tab', alt: 'A hairdresser blow-drying a client’s hair' },
-  { img: studio, label: 'Studios', note: 'Deposits and final balances', alt: 'A designer on the phone at her laptop in a sewing studio' },
-  { img: trades, label: 'Trades', note: 'Call-outs billed after the job', alt: 'An electrician on a ladder fitting a light' },
+  { img: florist, label: 'Florists', note: 'Event orders paid “after the wedding”', alt: 'A florist wrapping a bouquet of roses in brown paper' },
+  { img: salon, label: 'Salons', note: 'Regulars who run a tab', alt: 'A hairdresser laughing with a client as she blow-dries her hair' },
+  { img: studio, label: 'Studios', note: 'Deposits and final balances', alt: 'A potter checking her laptop among glazed bowls in her studio' },
+  { img: trades, label: 'Trades', note: 'Call-outs billed after the job', alt: 'An electrician on a stepladder fitting a pendant light' },
 ];
 
 const PROMISES: { icon: IconName; title: string; body: string }[] = [
@@ -84,12 +84,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
             <div className="enter-photo relative aspect-[4/5] overflow-hidden rounded-pay shadow-[var(--shadow-lift)] ring-1 ring-edge ring-inset">
               <Image
                 src={heroOwner}
-                alt="A smiling stall owner in an apron checking his phone"
+                alt="A smiling bakery owner in a floury apron checking his phone in the shop doorway"
                 fill
                 priority
                 placeholder="blur"
                 sizes="(min-width: 1024px) 520px, 90vw"
-                className="object-cover object-[38%_center]"
+                className="object-cover object-center"
               />
             </div>
 

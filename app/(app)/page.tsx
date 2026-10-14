@@ -11,7 +11,7 @@ import { allCustomerSummaries, breakdowns, overview, type CustomerState } from '
 import { getNow, getSettings } from '@/lib/settings';
 import { enterBusiness } from '@/lib/tenant';
 import { DAY, localDate, localParts } from '@/lib/time';
-import studio from '@/assets/img/studio.webp';
+import desk from '@/assets/img/desk.webp';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,7 +84,7 @@ export default async function Today() {
           </div>
         </div>
         <div className="relative hidden min-h-80 lg:block">
-          <Image src={studio} alt="A business owner on the phone at her laptop" fill placeholder="blur" sizes="560px" className="object-cover" />
+          <Image src={desk} alt="A tidy desk by a window with a laptop, invoices and a coffee" fill placeholder="blur" sizes="560px" className="object-cover" />
         </div>
       </Panel>
     );
