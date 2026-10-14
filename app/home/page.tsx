@@ -75,6 +75,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
           ))}
         </section>
       </main>
+
+      <footer className="mx-auto mt-16 flex max-w-6xl flex-wrap gap-5 text-sm text-faint">
+        <Link href="/privacy" className="hover:text-ink">Privacy</Link>
+        <Link href="/terms" className="hover:text-ink">Terms</Link>
+      </footer>
     </div>
   );
 }

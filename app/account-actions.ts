@@ -25,7 +25,7 @@ import { saveSettings } from '@/lib/settings';
 import { enterBusiness, runAsBusiness } from '@/lib/tenant';
 
 const MINUTE = 60_000;
-const str = (form: FormData, key: string) => String(form.get(key) ?? '').trim();
+const str = (form: FormData, key: string) => String(form.get(key) ?? '').trim().slice(0, 500);
 
 async function clientIp(): Promise<string> {
   const h = await headers();

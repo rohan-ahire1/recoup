@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cleanUp, getQuickBooks, listLiveBusinesses, tenantOf } from '@/lib/accounts';
-import { syncDue, syncQuickBooks } from '@/lib/quickbooks';
+import { alert } from '@/lib/alert';
+import { QuickBooksError, syncDue, syncQuickBooks } from '@/lib/quickbooks';
 import { runDueActions } from '@/lib/service';
 import { runAsBusiness } from '@/lib/tenant';
 
@@ -12,6 +13,7 @@ async function handle(req: Request) {
   if (!secret || req.headers.get('authorization') !== `Bearer ${secret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const problems: string[] = [];
   const totals = { businesses: 0, prepared: 0, sent: 0, failed: 0, synced: 0, syncErrors: 0, errors: 0, demosRemoved: cleanUp() };
   for (const b of listLiveBusinesses()) {
     totals.businesses++;
@@ -24,6 +26,8 @@ async function handle(req: Request) {
       } catch (err) {
         totals.syncErrors++;
         console.error(`QuickBooks sync failed for business ${b.id}`, err);
+        // A business that disconnected from inside QuickBooks is their choice, not a fault.
+        if (!(err instanceof QuickBooksError && err.disconnected)) problems.push(`QuickBooks sync, ${b.id}: ${String(err).slice(0, 200)}`);
       }
     }
     try {
@@ -34,8 +38,10 @@ async function handle(req: Request) {
     } catch (err) {
       totals.errors++;
       console.error(`Scheduler failed for business ${b.id}`, err);
+      problems.push(`Reminders, ${b.id}: ${String(err).slice(0, 200)}`);
     }
   }
+  if (problems.length) await alert('scheduler problems', problems.join('\n'));
   return NextResponse.json(totals, { status: totals.errors ? 500 : 200 });
 }
 

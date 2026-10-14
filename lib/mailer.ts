@@ -29,6 +29,10 @@ export async function sendLoginEmail(to: string, token: string): Promise<{ ok: b
     link,
     '',
     'It works once and expires in 15 minutes. If you didn’t ask for it, you can ignore this email.',
+    '',
+    '--',
+    `Privacy: ${baseUrl()}/privacy`,
+    `Terms: ${baseUrl()}/terms`,
   ].join('\n');
   try {
     const res = await fetch('https://api.resend.com/emails', {

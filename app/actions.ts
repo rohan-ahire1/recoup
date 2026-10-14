@@ -18,7 +18,9 @@ import type { Channel, ReplyKind } from '@/lib/types';
 
 const refresh = () => revalidatePath('/', 'layout');
 const num = (form: FormData, key: string) => Number(form.get(key));
-const str = (form: FormData, key: string) => String(form.get(key) ?? '').trim();
+/** Longer text (messages, notes, templates) gets more room; everything else is a short field. */
+const LONG_FIELDS = /^(body|notes|description|payInstructions)$|\.(email|sms)$/;
+const str = (form: FormData, key: string) => String(form.get(key) ?? '').trim().slice(0, LONG_FIELDS.test(key) ? 10_000 : 500);
 
 function requireDemo() {
   if (!isDemoMode()) throw new Error('Demo controls are only available in demo mode');
@@ -81,7 +83,7 @@ export async function skipAction(form: FormData) {
 
 export async function saveDraftAction(form: FormData) {
   enterBusiness(await requireBusiness());
-  svc.saveDraft(num(form, 'id'), form.has('subject') ? str(form, 'subject') : null, String(form.get('body') ?? ''));
+  svc.saveDraft(num(form, 'id'), form.has('subject') ? str(form, 'subject') : null, String(form.get('body') ?? '').slice(0, 10_000));
   refresh();
 }
 

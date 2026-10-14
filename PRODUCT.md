@@ -22,16 +22,23 @@ Owners and office managers of SMEs: service businesses, trades, agencies, suppli
 
 ## Delivery
 - **Prepared (default)**: Recoup drafts each message into "To send". The owner sends it with one click: open prefilled in Gmail, Outlook or their mail app, open prefilled as a text on a phone, or copy. Then they mark it sent.
-- **Automatic**: when an email or SMS provider is connected, messages go out on their own.
-- Mailbox integration (Gmail/Outlook sync) is planned, not built.
+- **Automatic**: email goes out on its own from a shared Recoup address as "Harbor Bakery via Recoup", with replies to the business. A business can verify its own domain to send from its own address. It needs a mailing address for the footer, has a daily cap, and pauses itself after too many bounces or spam complaints. Texts are always sent from the owner's phone.
+- **QuickBooks Online**: optional, read-only. Customers and invoices sync hourly; a payment recorded in QuickBooks stops reminders.
 
 ## AI (Premium)
 Personalizing messages from history, writing new template sets from a description, and reading customer replies. Shown as "Premium · coming soon" unless `ANTHROPIC_API_KEY` is configured, in which case the features work and the badge is hidden.
 
 ## Constraints
-- Messages go out in the business's name, never Recoup's.
+- Messages go out in the business's name. Until a business verifies its own domain, the sender shows "via Recoup".
 - STOP must always work for texts. No threatening language in built-in templates.
 - Never claim capabilities that aren't built (for example, email-open tracking in prepared mode).
+
+## Known gaps
+- Mailbox integration (Gmail/Outlook sync) is planned, not built. Replies are logged by hand.
+- Missed plan installments aren't chased yet.
+- No billing yet: every business gets everything.
+- QuickBooks only; Xero and FreshBooks would need their own connectors.
+- One server with SQLite. Fine for hundreds of businesses; Postgres would be needed to run several servers.
 
 ## Platform
 Web (responsive; phone use is common).

@@ -117,6 +117,11 @@ function adb(): DatabaseSync {
   return (g.__recoupAccounts ??= openDatabase(path.join(dataDir(), 'accounts.db'), MIGRATIONS));
 }
 
+/** For the health check: the accounts database answers. */
+export function countBusinesses(): number {
+  return Number((adb().prepare('SELECT count(*) AS n FROM businesses').get() as { n: number }).n);
+}
+
 /** For tests that swap DATA_DIR. */
 export function closeAccounts() {
   g.__recoupAccounts?.close();

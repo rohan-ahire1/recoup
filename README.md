@@ -46,6 +46,7 @@ With no keys set, it runs in **demo mode**. Nothing is really sent, payment page
 - **Due** is a date or days late (`32d`).
 - **Paid** is the date an invoice was paid. Leave it empty for unpaid invoices. Paid rows build the track record and are never chased.
 - Overdue-only files work too; add history later.
+- Up to 5 MB and 10,000 rows per file.
 
 ## Going live
 
@@ -58,6 +59,9 @@ With no keys set, it runs in **demo mode**. Nothing is really sent, payment page
 | QuickBooks Online | `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`, `QUICKBOOKS_ENVIRONMENT`, `TOKEN_ENCRYPTION_KEY` | Read-only. Register `/api/quickbooks/callback` as the redirect URI and `/api/quickbooks/disconnected` as the disconnect URL. Syncs on connect, then hourly from the scheduler; a payment in QuickBooks stops reminders. Tokens are encrypted with `TOKEN_ENCRYPTION_KEY`. |
 | Links | `PUBLIC_BASE_URL` | Used in payment links and sign-in emails. |
 | Sign-in emails | `AUTH_EMAIL_FROM` | Sender address for sign-in links (with `RESEND_API_KEY`). Required in production. |
+| Alerts | `NTFY_URL` | An ntfy topic URL. Unexpected server errors and scheduler problems send a push, at most once per 30 minutes per error. |
+| Support contact | `SUPPORT_EMAIL` | Shown on the Privacy and Terms pages. |
+| Health | | `GET /api/health` is 200 when the accounts and business databases answer. |
 | Scheduler | `CRON_SECRET` | Call `POST /api/cron/run` every 15 minutes (`Authorization: Bearer …`). |
 
 Demo controls only exist in demo workspaces ("Try the demo" on the home page). They never send real email and are deleted after 3 days.
@@ -90,6 +94,4 @@ PRODUCT.md, DESIGN.md   Product truth and the "Front desk" design system
 
 ## Known gaps
 
-- Gmail/Outlook mailbox sync is designed but not built. Replies are logged by hand.
-- Missed plan installments aren't chased yet.
-- SQLite fits a single server; swap `lib/db.ts` for Postgres for multi-instance hosting.
+See PRODUCT.md.
