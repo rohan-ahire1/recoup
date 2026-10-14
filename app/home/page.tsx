@@ -36,7 +36,8 @@ const PROMISES: { icon: IconName; title: string; body: string }[] = [
 export default async function Home({ searchParams }: { searchParams: Promise<{ deleted?: string; error?: string }> }) {
   const q = await searchParams;
   return (
-    <div className="min-h-screen overflow-x-clip">
+    <div className="relative min-h-screen overflow-x-clip">
+      <span className="ledger-margin hidden lg:block" aria-hidden="true" />
       <header className="sticky top-0 z-40 bg-sand/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-10">
           <Link href="/" className="display text-heading font-bold text-teal">recoup</Link>
@@ -104,14 +105,29 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
               </Panel>
             </div>
 
-            <div className="enter-card-2 absolute -right-2 bottom-10 sm:-right-8">
-              <Panel lift as="div" className="flex items-center gap-3 py-3 pr-5 pl-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-teal text-paper">
-                  <Icon name="check" size={20} />
-                </span>
-                <span>
-                  <span className="block text-xs text-faint">Harbor Street Bakery paid</span>
-                  <span className="display num block text-section font-bold text-teal">$1,240.00</span>
+            <div className="enter-card-2 absolute -right-2 -bottom-6 w-72 sm:-right-8">
+              <Panel lift as="div" className="px-5 pt-4 pb-5">
+                <p className="text-xs text-faint">Ferro Service Co. · overdue</p>
+                <ul className="mt-2 text-sm">
+                  {[
+                    { n: '2034', who: 'Dana Okafor', amt: '$300.00' },
+                    { n: '2041', who: 'Harbor St Bakery', amt: '$1,240.00', paid: true },
+                    { n: '2052', who: 'Pine & Co', amt: '$860.00' },
+                  ].map((r) => (
+                    <li key={r.n} className={`relative flex h-8 items-center gap-3 border-b border-teal/15 ${r.paid ? 'text-teal' : ''}`}>
+                      <span className="num w-12 text-faint">#{r.n}</span>
+                      <span className="min-w-0 flex-1 truncate">{r.who}</span>
+                      <span className="num font-semibold">{r.amt}</span>
+                      {r.paid && <span className="strike" aria-hidden="true" />}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 flex justify-between text-sm">
+                  <span className="text-muted">Still owed</span>
+                  <span className="num border-b-[3px] border-double border-ink font-semibold">$1,160.00</span>
+                </p>
+                <span className="stamp display absolute top-16 right-5 rounded-tooltip border-[3px] border-teal px-3 text-section font-bold text-teal" aria-label="Paid">
+                  PAID
                 </span>
               </Panel>
             </div>

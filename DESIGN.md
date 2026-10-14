@@ -4,7 +4,8 @@ Recoup should feel like a capable, warm office manager, not a debt collector and
 
 ## Surface
 - Operate mode throughout the app; the customer-facing pay page is a calm, single-task version of the same world.
-- Ground is warm sand; content sits on white panels with generous radius. No nested panels.
+- Ground is warm sand ruled like a ledger book: a faint teal line every 32px (`body` in `app/globals.css`). Content sits on clean white panels with generous radius. No nested panels.
+- Public pages add the rest of the ledger: a red double margin rule (`.ledger-margin`), an entry struck through in teal when it's paid (`.strike`), a teal PAID stamp (`.stamp`), and the accountant's double rule under totals (`border-double`).
 - Plain-English summaries lead ("Dana usually pays. Just a little late, now and then."), with numbers beside them.
 
 ## Color (tokens in app/globals.css)
