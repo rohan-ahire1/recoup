@@ -4,7 +4,7 @@ import { AutoSubmitForm } from '@/app/components/AutoSubmit';
 import { FilterBar } from '@/app/components/FilterBar';
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { Avatar, ButtonLink, Chip, Empty, ListToolbar, PageTitle, Panel, ReliabilityDot, StatePill } from '@/app/components/ui';
+import { Avatar, ButtonLink, Chip, Empty, FIELD, ListToolbar, PageTitle, Panel, ReliabilityDot, StatePill } from '@/app/components/ui';
 import { requireBusiness } from '@/lib/auth';
 import { formatDateTime, money, plural, relativeTime } from '@/lib/format';
 import { allCustomerSummaries, ageBucket, AGE_BUCKETS, type CustomerSummary } from '@/lib/service';
@@ -58,7 +58,7 @@ function applyFilters(all: CustomerSummary[], q: Query) {
 }
 
 const select =
-  'h-11 rounded-[var(--radius-control)] bg-paper pr-8 pl-3 text-[15px] ring-1 ring-line ring-inset focus:ring-teal appearance-none bg-[length:16px] bg-[right_10px_center] bg-no-repeat';
+  'h-11 rounded-control bg-paper pr-8 pl-3 text-[15px] ring-1 ring-field ring-inset focus:ring-teal appearance-none bg-[length:16px] bg-[right_10px_center] bg-no-repeat';
 const chevron = { backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e574b' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")" };
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<Query> }) {
@@ -117,7 +117,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             defaultValue={q.q}
             placeholder="Search customers"
             title="Search by name, email or tag"
-            className="h-11 w-full rounded-[var(--radius-control)] bg-paper pr-3 pl-10 ring-1 ring-line ring-inset placeholder:text-faint focus:ring-teal"
+            className={`h-11 pl-10 ${FIELD}`}
           />
         </label>
         }>
@@ -152,7 +152,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
             ))}
           </select>
         )}
-        <span className="flex items-center gap-1 rounded-[var(--radius-control)] bg-paper px-3 ring-1 ring-line ring-inset">
+        <span className="flex items-center gap-1 rounded-control bg-paper px-3 ring-1 ring-field ring-inset">
           <span className="text-sm text-muted">Owed $</span>
           <input type="number" name="min" min={0} defaultValue={q.min} placeholder="min" aria-label="Minimum owed" className="num h-11 w-16 bg-transparent placeholder:text-faint focus:outline-none" />
           <span className="text-faint">–</span>
@@ -177,12 +177,12 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
         <form action={saveViewAction} className="mb-5 flex flex-wrap items-center gap-2">
           <input type="hidden" name="query" value={query} />
           <label className="sr-only" htmlFor="view-name">Name this view</label>
-          <input id="view-name" name="name" required placeholder="Name this view, e.g. Big and late" className="h-9 w-64 rounded-[var(--radius-control)] bg-paper px-3 text-sm ring-1 ring-line ring-inset placeholder:text-faint focus:ring-teal" />
+          <input id="view-name" name="name" required placeholder="Name this view, e.g. Big and late" className={`h-9 w-64 text-sm ${FIELD}`} />
           <SubmitButton size="sm" variant="outline" icon="plus" pendingLabel="Saving…">Save view</SubmitButton>
         </form>
       )}
       {rows.length > 0 && (
-        <div className="hidden grid-cols-[2.75rem_minmax(0,2fr)_minmax(0,1.1fr)_7.5rem_minmax(0,1.3fr)] gap-x-4 rounded-t-[var(--radius-panel)] border-b border-linen bg-paper px-6 py-3 text-sm text-muted md:grid">
+        <div className="hidden grid-cols-[2.75rem_minmax(0,2fr)_minmax(0,1.1fr)_7.5rem_minmax(0,1.3fr)] gap-x-4 rounded-t-panel border-b border-linen bg-paper px-6 py-3 text-sm text-muted md:grid">
           <span />
           <span>Customer</span>
           <span>Pattern</span>

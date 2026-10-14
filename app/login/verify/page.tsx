@@ -11,7 +11,7 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   return (
     <PublicShell>
       <Panel lift className="p-6 text-center sm:p-8">
-        <h1 className="display text-[30px] leading-tight font-bold">Welcome to Recoup</h1>
+        <h1 className="display text-title font-bold">Welcome to Recoup</h1>
         <p className="mt-2 text-muted">One click and you’re in.</p>
         <form action={verifyLoginAction} className="mt-6">
           <input type="hidden" name="token" value={token} />

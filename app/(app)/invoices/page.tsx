@@ -4,7 +4,7 @@ import { AutoSubmitForm } from '@/app/components/AutoSubmit';
 import { FilterBar } from '@/app/components/FilterBar';
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { buttonClass, Empty, ListToolbar, PageTitle, Panel } from '@/app/components/ui';
+import { buttonClass, Empty, FIELD, ListToolbar, PageTitle, Panel } from '@/app/components/ui';
 import { requireBusiness } from '@/lib/auth';
 import { formatShortDate, money, plural } from '@/lib/format';
 import { AGE_BUCKETS } from '@/lib/service';
@@ -15,7 +15,7 @@ import { invoiceRows, type InvoiceQuery, type InvoiceRow } from '@/lib/views';
 export const dynamic = 'force-dynamic';
 
 const select =
-  'h-11 appearance-none rounded-[var(--radius-control)] bg-paper bg-[length:16px] bg-[right_10px_center] bg-no-repeat pr-8 pl-3 text-[15px] ring-1 ring-line ring-inset focus:ring-teal';
+  'h-11 appearance-none rounded-control bg-paper bg-[length:16px] bg-[right_10px_center] bg-no-repeat pr-8 pl-3 text-[15px] ring-1 ring-field ring-inset focus:ring-teal';
 const chevron = { backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235e574b' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")" };
 
 function statusText(r: InvoiceRow) {
@@ -73,7 +73,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           <label className="relative min-w-0 flex-1 md:max-w-72">
           <span className="sr-only">Search invoices</span>
           <Icon name="search" className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-faint" />
-          <input type="text" name="q" defaultValue={q.q} placeholder="Invoice #, customer, description" className="h-11 w-full rounded-[var(--radius-control)] bg-paper pr-3 pl-10 ring-1 ring-line ring-inset placeholder:text-faint focus:ring-teal" />
+          <input type="text" name="q" defaultValue={q.q} placeholder="Invoice #, customer, description" className={`h-11 pl-10 ${FIELD}`} />
         </label>
         }>
         <select name="status" defaultValue={q.status ?? ''} aria-label="Status" className={select} style={chevron}>
@@ -96,7 +96,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
           <option value="business">Businesses</option>
           <option value="individual">Individuals</option>
         </select>
-        <span className="flex items-center gap-1 rounded-[var(--radius-control)] bg-paper px-3 ring-1 ring-line ring-inset">
+        <span className="flex items-center gap-1 rounded-control bg-paper px-3 ring-1 ring-field ring-inset">
           <span className="text-sm text-muted">Amount $</span>
           <input type="number" name="min" min={0} defaultValue={q.min} placeholder="min" aria-label="Minimum amount" className="num h-11 w-16 bg-transparent placeholder:text-faint focus:outline-none" />
           <span className="text-faint">–</span>

@@ -12,20 +12,54 @@
   --color-ink: #23201b;
   --color-ink-2: #3b362e;
   --color-muted: #5e574b;
-  --color-faint: #7a7263;
+  /* 4.65:1 on linen, 4.86:1 on sand, 5.67:1 on paper: safe for small text on every surface but linen-2. */
+  --color-faint: #6e6657;
+  /* Border of anything you type into (inputs, selects, textareas): 3.5:1 on paper. Hairlines stay `line`. */
+  --color-field: #948770;
+  /* The 1px inner edge every paper panel gets on sand. */
+  --color-edge: rgb(35 32 27 / 0.06);
 
   --color-teal: #0f5c55;
   --color-teal-strong: #0a433e;
   --color-teal-soft: #e6f0ee;
-  --color-marigold: #e8a33d;
+  --color-marigold: #d4932f;
   --color-marigold-soft: #f6d9a6;
   --color-marigold-wash: #fbf0dc;
   --color-marigold-ink: #6b4510;
   --color-rust: #a8321f;
   --color-rust-soft: #f7e3de;
 
-  --radius-panel: 24px;
-  --radius-control: 14px;
+  /* Lateness ramp for aging charts: light to dark ochre. */
+  --color-aging-1: #f2c57c;
+  --color-aging-2: #d4932f;
+  --color-aging-3: #a86f1c;
+  --color-aging-4: #7a5012;
+
+  /* Corners: outer > inner, so nested shapes sit snugly. */
+  --radius-pay: 24px;
+  --radius-panel: 20px;
+  --radius-block: 14px;
+  --radius-control: 10px;
+  --radius-tooltip: 8px;
+  --radius-tail: 4px;
+
+  /* Display scale (Bricolage): five steps, tracking tightens as size grows. */
+  --text-money: 56px;
+  --text-money--line-height: 1;
+  --text-money--letter-spacing: -0.035em;
+  --text-title: 36px;
+  --text-title--line-height: 1.08;
+  --text-title--letter-spacing: -0.035em;
+  --text-heading: 28px;
+  --text-heading--line-height: 1.2;
+  --text-heading--letter-spacing: -0.025em;
+  --text-section: 22px;
+  --text-section--line-height: 1.25;
+  --text-section--letter-spacing: -0.02em;
+  --text-lead: 19px;
+  --text-lead--line-height: 1.375;
+  --text-lead--letter-spacing: -0.01em;
+
   --shadow-lift: 0 20px 40px -24px rgb(35 32 27 / 0.35), 0 2px 6px -2px rgb(35 32 27 / 0.06);
 }
 
@@ -39,7 +73,10 @@ html {
 }
 
 body {
-  background: var(--color-sand);
+  /* Sand with a faint paper grain. */
+  background-color: var(--color-sand);
+  background-image: radial-gradient(rgb(35 32 27 / 0.022) 1px, transparent 1px);
+  background-size: 4px 4px;
   font-family: var(--font-sans);
   font-size: 15px;
   line-height: 1.5;
@@ -76,9 +113,12 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
-.display {
-  font-family: var(--font-display);
-  letter-spacing: -0.03em;
+/* In the components layer so a text-money/title/heading/section/lead size sets its own tracking. */
+@layer components {
+  .display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

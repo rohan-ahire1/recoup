@@ -20,12 +20,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <Panel lift className="p-6 sm:p-8">
         {q.sent ? (
           <>
-            <h1 className="display text-[30px] leading-tight font-bold">Check your email</h1>
+            <h1 className="display text-title font-bold">Check your email</h1>
             <p className="mt-2 text-muted">
               We sent a sign-in link to <span className="font-semibold text-ink">{q.sent}</span>. It works once and expires in 15 minutes.
             </p>
             {q.dev && (
-              <p className="mt-5 rounded-2xl bg-linen px-4 py-3 text-sm break-all">
+              <p className="mt-5 rounded-block bg-linen px-4 py-3 text-sm break-all">
                 Email isn’t set up on this server, so here’s the link: <a className="font-semibold text-teal underline" href={q.dev}>sign in</a>
               </p>
             )}
@@ -34,7 +34,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         ) : (
           <>
             {q.error && <Notice tone="rust">{ERRORS[q.error] ?? 'Something went wrong. Please try again.'}</Notice>}
-            <h1 className="display text-[30px] leading-tight font-bold">Sign in or create an account</h1>
+            <h1 className="display text-title font-bold">Sign in or create an account</h1>
             <p className="mt-2 text-muted">No password. We’ll email you a link.</p>
             <form action={requestLoginAction} className="mt-6 flex flex-col gap-4 text-sm font-semibold">
               <label>

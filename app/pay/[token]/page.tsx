@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { Icon } from '@/app/components/icons';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { buttonClass } from '@/app/components/ui';
-import { formatLongDate, formatShortDate, money } from '@/lib/format';
+import { BigMoney, buttonClass } from '@/app/components/ui';
+import { formatLongDate, formatShortDate, money, moneyShort } from '@/lib/format';
 import { enterPayLink } from '@/lib/pay-access';
 import { getCustomerByToken, getOpenCase, listInstallments } from '@/lib/repo';
 import { PLAN_OFFER_STEP, splitInstallments } from '@/lib/sequence';
@@ -28,15 +28,15 @@ function HowToPay({ token, amount, instructions, link, businessName, sent }: { t
         </a>
       )}
       {instructions ? (
-        <div className="rounded-2xl bg-linen/60 px-4 py-3.5">
+        <div className="rounded-block bg-linen/60 px-4 py-3.5">
           <p className="text-sm font-semibold">How to pay {businessName.replace(/\.$/, '')}</p>
           <p className="mt-1 text-[15px] whitespace-pre-line">{instructions}</p>
         </div>
       ) : (
-        !link && <p className="rounded-2xl bg-linen/60 px-4 py-3.5 text-[15px]">Reply to the message from {businessName.replace(/\.$/, '')} and they’ll tell you how to pay.</p>
+        !link && <p className="rounded-block bg-linen/60 px-4 py-3.5 text-[15px]">Reply to the message from {businessName.replace(/\.$/, '')} and they’ll tell you how to pay.</p>
       )}
       {sent ? (
-        <p className="rounded-2xl bg-teal-soft px-4 py-3 text-center text-sm font-semibold text-teal-strong">Thanks! We’ve let {businessName.replace(/\.$/, '')} know.</p>
+        <p className="rounded-block bg-teal-soft px-4 py-3 text-center text-sm font-semibold text-teal-strong">Thanks! We’ve let {businessName.replace(/\.$/, '')} know.</p>
       ) : (
         <form action={`/api/pay/${token}`} method="post">
           <input type="hidden" name="action" value="sent" />
@@ -75,20 +75,20 @@ export default async function PayPage({
   return (
     <div className="min-h-screen px-4 py-10 sm:py-16">
       <main className="mx-auto flex max-w-md flex-col gap-6">
-        <p className="display text-center text-[26px] font-bold">{businessName}</p>
+        <p className="display text-center text-heading font-bold">{businessName}</p>
 
-        <div className="rounded-[28px] bg-paper p-6 shadow-[var(--shadow-lift)] sm:p-8">
-          {query.error && <p className="mb-5 rounded-2xl bg-rust-soft px-4 py-3 text-sm text-rust">{query.error === 'slow' ? 'Too many tries. Please wait a little and try again.' : 'Something went wrong. Please try again.'}</p>}
+        <div className="rounded-pay bg-paper p-6 ring-1 ring-edge ring-inset shadow-[var(--shadow-lift)] sm:p-8">
+          {query.error && <p className="mb-5 rounded-block bg-rust-soft px-4 py-3 text-sm text-rust">{query.error === 'slow' ? 'Too many tries. Please wait a little and try again.' : 'Something went wrong. Please try again.'}</p>}
 
           {nextInstallment ? (
             <>
-              {query.plan === 'set' && <p className="mb-5 rounded-2xl bg-teal-soft px-4 py-3 text-sm font-semibold text-teal-strong">Your plan is set, {first}. Thank you!</p>}
+              {query.plan === 'set' && <p className="mb-5 rounded-block bg-teal-soft px-4 py-3 text-sm font-semibold text-teal-strong">Your plan is set, {first}. Thank you!</p>}
               <p className="text-muted">Your payment plan</p>
-              <p className="display num mt-1 text-[44px] leading-none font-bold">{money(nextInstallment.amountCents)}</p>
+              <BigMoney value={moneyShort(nextInstallment.amountCents)} className="mt-1" />
               <p className="mt-2 text-muted">
                 Payment {nextInstallment.seq} of {installments.length}, due {formatLongDate(nextInstallment.dueAt, timezone)}
               </p>
-              <ul className="mt-6 divide-y divide-linen rounded-2xl ring-1 ring-line">
+              <ul className="mt-6 divide-y divide-linen rounded-block ring-1 ring-line">
                 {installments.map((i) => (
                   <li key={i.id} className="flex items-center justify-between px-4 py-3 text-[15px]">
                     <span className={i.paidAt ? 'text-muted' : ''}>{formatLongDate(i.dueAt, timezone)}</span>
@@ -106,13 +106,13 @@ export default async function PayPage({
               <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-teal-soft text-teal">
                 <Icon name="check" size={28} />
               </span>
-              <h1 className="display mt-5 text-[26px] font-bold">You’re all paid up</h1>
+              <h1 className="display mt-5 text-heading font-bold">You’re all paid up</h1>
               <p className="mt-2 text-muted">There’s nothing to pay right now.</p>
             </div>
           ) : (
             <>
               <p className="text-muted">Hi {first}, here’s what’s due</p>
-              <p className="display num mt-1 text-[48px] leading-none font-bold">{money(total)}</p>
+              <BigMoney value={moneyShort(total)} className="mt-1" />
               <ul className="mt-6 divide-y divide-linen">
                 {invoices.map((i) => (
                   <li key={i.id} className="flex items-baseline justify-between gap-4 py-3">
@@ -130,7 +130,7 @@ export default async function PayPage({
 
               {planOffered && (
                 <div id="plan" className="mt-8 border-t border-linen pt-6">
-                  <h2 className="display text-[20px] font-bold">Or split it up</h2>
+                  <h2 className="display text-section font-bold">Or split it up</h2>
                   <p className="mt-1 text-muted">Pay part now and the rest every two weeks. No fees.</p>
                   <div className="mt-4 flex flex-col gap-2">
                     {[2, 3].map((count) => {
@@ -139,7 +139,7 @@ export default async function PayPage({
                         <form key={count} action={`/api/pay/${token}`} method="post">
                           <input type="hidden" name="action" value="plan" />
                           <input type="hidden" name="count" value={count} />
-                          <button type="submit" className="ease flex w-full items-center justify-between gap-4 rounded-2xl px-4 py-3.5 text-left ring-1 ring-line ring-inset hover:bg-linen/60 hover:ring-linen-2">
+                          <button type="submit" className="ease flex w-full items-center justify-between gap-4 rounded-block px-4 py-3.5 text-left ring-1 ring-line ring-inset hover:bg-linen/60 hover:ring-linen-2">
                             <span className="font-semibold">{count} payments</span>
                             <span className="num text-right text-muted">
                               <span className="font-semibold text-ink">{money(parts[0])}</span> now

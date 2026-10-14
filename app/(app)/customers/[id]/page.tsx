@@ -19,10 +19,10 @@ import { ReplyForm } from '@/app/components/ReplyForm';
 import { SendPanel } from '@/app/components/SendPanel';
 import { StoryFilter } from '@/app/components/StoryFilter';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { Avatar, Chip, Panel, StatePill, TrackDots } from '@/app/components/ui';
+import { Avatar, BigMoney, Chip, FIELD, Panel, StatePill, TrackDots } from '@/app/components/ui';
 import { aiEnabled } from '@/lib/ai';
 import { requireBusiness } from '@/lib/auth';
-import { formatDateLong, formatDateTime, formatPhone, formatShortDate, money, plural } from '@/lib/format';
+import { formatDateLong, formatDateTime, formatPhone, formatShortDate, money, moneyShort, plural } from '@/lib/format';
 import { isDemoMode, providerStatus } from '@/lib/providers';
 import { getCustomer, listCustomerInvoices, listCustomerMessages, listEvents, listInstallments, listTemplateSets } from '@/lib/repo';
 import { STEPS } from '@/lib/sequence';
@@ -205,7 +205,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 </div>
                 <div
                   className={`max-w-[62ch] px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap [overflow-wrap:anywhere] ${
-                    it.m.direction === 'inbound' ? 'self-start rounded-[16px_4px_16px_16px] bg-linen text-ink' : 'rounded-[4px_16px_16px_16px] bg-linen/50 text-ink-2'
+                    it.m.direction === 'inbound' ? 'self-start rounded-block rounded-tr-tail bg-linen text-ink' : 'rounded-block rounded-tl-tail bg-linen/50 text-ink-2'
                   }`}
                 >
                   {it.m.subject && <span className="mb-1 block font-semibold text-ink">{it.m.subject}</span>}
@@ -222,7 +222,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const stepInfo = s.ready?.step ? STEPS.find((x) => x.step === s.ready!.step) : null;
   const readyLabel = stepInfo?.label ?? (s.ready?.actionKey?.startsWith('installment') ? 'Payment plan reminder' : 'Payment plan offer');
   const selectedSet = customer.templateSetId ?? 'default';
-  const input = 'mt-1 block h-11 w-full rounded-[var(--radius-control)] bg-paper px-3 font-normal ring-1 ring-line ring-inset focus:ring-teal';
+  const input = `mt-1 h-11 ${FIELD}`;
 
   return (
     <div>
@@ -236,7 +236,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <Panel className="flex flex-col gap-5 p-6">
             <Avatar name={customer.name} type={customer.type} size={60} />
             <div>
-              <h1 className="display text-[28px] leading-[1.08] font-bold text-balance">{customer.name}</h1>
+              <h1 className="display text-title font-bold text-balance">{customer.name}</h1>
               <p className="mt-1.5 text-muted">
                 {customer.type === 'business' ? 'Business' : 'Individual'}
                 {paid.length ? ` · customer since ${new Date(`${paid[paid.length - 1].dueDate}T12:00:00Z`).getUTCFullYear()}` : ''}
@@ -272,7 +272,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 ))}
               </div>
             )}
-            {customer.notes && <p className="rounded-2xl bg-linen/60 px-4 py-3 text-sm text-ink-2">{customer.notes}</p>}
+            {customer.notes && <p className="rounded-block bg-linen/60 px-4 py-3 text-sm text-ink-2">{customer.notes}</p>}
             <Link href={`/customers/${customer.id}/edit`} className="inline-flex items-center gap-1.5 self-start text-sm font-semibold text-teal hover:underline">
               <Icon name="edit" size={15} /> Edit details
             </Link>
@@ -280,7 +280,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
           <Panel className="bg-teal! p-6 text-sand">
             <div className="text-sm text-sand/85">{s.owedCents ? 'Owed right now' : 'Owes nothing right now'}</div>
-            <div className="display num mt-1 text-[48px] leading-none font-bold">{money(s.owedCents).replace(/\.00$/, '')}</div>
+            <BigMoney value={moneyShort(s.owedCents)} className="mt-2" />
             {open.length > 0 && (
               <ul className="mt-4 flex flex-col gap-1.5 text-sm text-sand/90">
                 {open.map((i) => {
@@ -298,7 +298,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           </Panel>
 
           <Panel className="flex flex-col gap-3 p-6">
-            <p className="display text-[19px] leading-snug font-semibold text-pretty">{s.summaryLine}</p>
+            <p className="display text-lead font-semibold text-pretty">{s.summaryLine}</p>
             <TrackDots lateness={s.record.lateness} open={open.filter((i) => i.dueDate < t).length} />
             <p className="text-sm text-muted">
               {s.record.paidCount ? (
@@ -320,7 +320,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
           <div className="flex min-w-0 flex-col gap-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <h2 className="display text-[22px] leading-tight font-bold">
+              <h2 className="display text-section font-bold">
                 {s.ready ? `Next up: ${readyLabel.toLowerCase()}` : s.state === 'clear' ? 'All paid up' : 'What’s happening'}
               </h2>
               <p className="mt-1 text-muted">
@@ -354,7 +354,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               <fieldset>
                 <legend className="mb-2 text-sm font-semibold">How should it sound?</legend>
                 <div className="grid grid-cols-2 gap-2">
-                  <label className="ease col-span-2 flex cursor-pointer items-center gap-3 rounded-[var(--radius-control)] px-3.5 py-2.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal">
+                  <label className="ease col-span-2 flex cursor-pointer items-center gap-3 rounded-control px-3.5 py-2.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal">
                     <input type="radio" name="templateSetId" value="default" defaultChecked={selectedSet === 'default'} className="sr-only" />
                     <Icon name="sparkle" size={16} className="text-teal" />
                     <span className="text-sm">
@@ -364,7 +364,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                   {sets.map((set) => (
                     <label
                       key={set.id}
-                      className="ease flex cursor-pointer flex-col rounded-[var(--radius-control)] px-3.5 py-2.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal"
+                      className="ease flex cursor-pointer flex-col rounded-control px-3.5 py-2.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal"
                     >
                       <input type="radio" name="templateSetId" value={set.id} defaultChecked={selectedSet === set.id} className="sr-only" />
                       <span className="font-semibold">{set.name}</span>
@@ -470,7 +470,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                 />
               )}
               {s.state === 'plan' && installments.length > 0 && (
-                <ul className="divide-y divide-linen rounded-2xl ring-1 ring-line">
+                <ul className="divide-y divide-linen rounded-block ring-1 ring-line">
                   {installments.map((i) => (
                     <li key={i.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                       <span>Payment {i.seq} · {formatDateTime(i.dueAt, timezone).split(',')[0]}</span>
@@ -489,7 +489,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
         {/* ------------------------------------------------ the story */}
           <Panel className="p-6 sm:p-7">
             <div className="mb-5 flex flex-wrap items-baseline justify-between gap-3">
-              <h2 className="display text-[22px] font-bold">The story so far</h2>
+              <h2 className="display text-section font-bold">The story so far</h2>
               <span className="text-sm text-muted">{story.length > STORY_PREVIEW ? `Latest ${STORY_PREVIEW} of ${story.length}` : plural(story.length, 'entry', 'entries')}</span>
             </div>
             {story.length === 0 ? (
@@ -514,7 +514,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
 
           <Panel className="p-6 sm:p-7">
             <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-              <h2 className="display text-[22px] font-bold">{openList.length ? 'Open invoices' : 'Invoices'}</h2>
+              <h2 className="display text-section font-bold">{openList.length ? 'Open invoices' : 'Invoices'}</h2>
               <span className="text-sm text-muted">
                 {openList.length ? `${plural(openList.length, 'invoice')} · ${money(s.owedCents)}` : 'Nothing open'}
               </span>

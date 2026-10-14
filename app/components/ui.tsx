@@ -16,14 +16,44 @@ export function Panel({
   as?: 'section' | 'div' | 'aside' | 'article';
   lift?: boolean;
 }) {
-  return <Tag className={`rounded-[var(--radius-panel)] bg-paper ${lift ? 'shadow-[var(--shadow-lift)]' : ''} ${className}`}>{children}</Tag>;
+  return <Tag className={`rounded-panel bg-paper ring-1 ring-edge ring-inset ${lift ? 'shadow-[var(--shadow-lift)]' : ''} ${className}`}>{children}</Tag>;
+}
+
+/** Every field you type into or pick from. One place, so borders and focus never drift. */
+export const FIELD = 'block w-full rounded-control bg-paper px-3 font-normal ring-1 ring-field ring-inset placeholder:text-faint focus:ring-teal';
+
+/**
+ * Headline money: the figure big, the currency sign smaller and quieter.
+ * Inherits colour, so it works on paper and on teal. Long amounts shrink to fit
+ * their column (e.g. $12,480.50 in the customer sidebar); short ones stay at 56px.
+ */
+export function BigMoney({ value, className = '' }: { value: string; className?: string }) {
+  const m = /^(-?)([^\d-]+)(.*)$/.exec(value);
+  const glyphs = (m ? m[1].length + m[3].length : value.length) + 0.5;
+  const fit = `min(var(--text-money), ${(100 / (0.62 * glyphs)).toFixed(1)}cqi)`;
+  return (
+    <div className={`@container ${className}`}>
+      <span className="display num flex items-start text-money font-bold" style={{ fontSize: fit }}>
+        {m ? (
+          <>
+            {m[1]}
+            <span className="mt-[0.12em] mr-0.5 text-[0.5em] font-semibold opacity-70" aria-hidden="true">{m[2]}</span>
+            <span className="sr-only">{m[2]}</span>
+            {m[3]}
+          </>
+        ) : (
+          value
+        )}
+      </span>
+    </div>
+  );
 }
 
 export function PageTitle({ title, sub, actions }: { title: string; sub?: React.ReactNode; actions?: React.ReactNode }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="display text-[30px] leading-tight font-bold text-balance">{title}</h1>
+        <h1 className="display text-title font-bold text-balance">{title}</h1>
         {sub && <p className="mt-1 text-muted">{sub}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
@@ -44,7 +74,7 @@ export type ButtonVariant = keyof typeof BUTTON;
 
 export function buttonClass(variant: ButtonVariant = 'quiet', size: 'sm' | 'md' | 'lg' = 'md') {
   const sizes = { sm: 'h-9 px-3 text-sm gap-1.5', md: 'h-11 px-4 text-[15px] gap-2', lg: 'h-[52px] px-5 text-base gap-2' };
-  return `ease inline-flex items-center justify-center rounded-[var(--radius-control)] font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-55 ${sizes[size]} ${BUTTON[variant]}`;
+  return `ease inline-flex items-center justify-center rounded-control font-semibold whitespace-nowrap disabled:cursor-not-allowed disabled:opacity-55 ${sizes[size]} ${BUTTON[variant]}`;
 }
 
 export function ButtonLink({
@@ -161,7 +191,7 @@ export function PremiumBadge() {
 export function PremiumTeaser({ title, detail }: { title: string; detail: string }) {
   return (
     // Sized by its own width, not the page's: in a narrow card the badge drops under the text instead of squeezing it.
-    <div className="@container rounded-2xl border-[1.5px] border-dashed border-linen-2 px-4 py-3">
+    <div className="@container rounded-block border-[1.5px] border-dashed border-linen-2 px-4 py-3">
       <div className="flex items-start gap-3 @md:items-center">
         <Icon name="sparkle" className="mt-0.5 shrink-0 text-marigold-ink @md:mt-0" />
         <div className="flex min-w-0 flex-1 flex-col items-start gap-2 @md:flex-row @md:items-center @md:justify-between @md:gap-4">
@@ -178,8 +208,8 @@ export function PremiumTeaser({ title, detail }: { title: string; detail: string
 
 export function Empty({ title, children, action }: { title: string; children?: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="rounded-[var(--radius-panel)] border-[1.5px] border-dashed border-linen-2 px-6 py-12 text-center">
-      <p className="display text-xl font-semibold">{title}</p>
+    <div className="rounded-panel border-[1.5px] border-dashed border-linen-2 px-6 py-12 text-center">
+      <p className="display text-section font-semibold">{title}</p>
       {children && <div className="mx-auto mt-2 max-w-md text-muted">{children}</div>}
       {action && <div className="mt-5 flex justify-center gap-2">{action}</div>}
     </div>
@@ -190,7 +220,7 @@ export function Stat({ label, value, sub }: { label: string; value: React.ReactN
   return (
     <div>
       <div className="text-sm text-muted">{label}</div>
-      <div className="display num mt-0.5 text-[26px] leading-tight font-bold">{value}</div>
+      <div className="display num mt-0.5 text-heading font-bold">{value}</div>
       {sub && <div className="mt-0.5 text-sm text-faint">{sub}</div>}
     </div>
   );

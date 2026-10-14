@@ -21,7 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <>
       <StickyBar as="header" varName="--header-h" className="sticky top-0 z-40 bg-sand/85 py-2 shadow-[0_1px_0_var(--color-line)] backdrop-blur-md lg:py-3">
         <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-6 gap-y-1 px-4 sm:px-6 lg:px-10">
-          <Link href="/" className="display text-[26px] font-bold text-teal">
+          <Link href="/" className="display text-heading font-bold text-teal">
             recoup
           </Link>
           <div className="order-3 w-full min-w-0 lg:order-none lg:w-auto lg:flex-1">

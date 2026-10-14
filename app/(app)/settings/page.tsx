@@ -1,7 +1,7 @@
 import { deleteBusinessAction, signOutAction } from '@/app/account-actions';
 import { saveSettingsAction, toggleDemoBarAction } from '@/app/actions';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { Chip, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
+import { Chip, FIELD, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
 import { aiEnabled } from '@/lib/ai';
 import { getUser } from '@/lib/accounts';
 import { requireBusiness, requireSession } from '@/lib/auth';
@@ -36,14 +36,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   const p = providerStatus();
   const canAuto = p.email !== 'mock';
   const zones = TIMEZONES.includes(s.timezone) ? TIMEZONES : [s.timezone, ...TIMEZONES];
-  const field = 'mt-1 block h-11 w-full rounded-[var(--radius-control)] bg-paper px-3 font-normal ring-1 ring-line ring-inset focus:ring-teal';
+  const field = `mt-1 h-11 ${FIELD}`;
 
   return (
     <div className="mx-auto max-w-3xl">
       <PageTitle title="Settings" />
       <form action={saveSettingsAction} className="flex flex-col gap-6">
         <Panel className="grid gap-4 p-6 text-sm font-semibold sm:grid-cols-2 sm:p-7">
-          <h2 className="display text-[22px] font-bold sm:col-span-2">Your business</h2>
+          <h2 className="display text-section font-bold sm:col-span-2">Your business</h2>
           <label>
             Business name
             <input name="businessName" defaultValue={s.businessName} required className={field} />
@@ -70,7 +70,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
         <Panel className="grid gap-4 p-6 text-sm font-semibold sm:p-7">
           <div>
-            <h2 className="display text-[22px] font-bold">How customers pay you</h2>
+            <h2 className="display text-section font-bold">How customers pay you</h2>
             <p className="font-normal text-muted">Shown on each customer’s payment page, under what they owe. Recoup never handles the money.</p>
           </div>
           <label>
@@ -92,12 +92,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         </Panel>
 
         <Panel className="flex flex-col gap-3 p-6 sm:p-7">
-          <h2 className="display text-[22px] font-bold">Sending</h2>
+          <h2 className="display text-section font-bold">Sending</h2>
           {[
             { v: 'prepare', title: 'I’ll send them myself', detail: 'Recoup drafts each reminder. You open it in Gmail, Outlook, your mail app or your phone, and press send.' },
             { v: 'auto', title: 'Send automatically', detail: canAuto ? 'Emails go out on their own. Texts still open on your phone for you to send.' : 'Needs email sending, below.' },
           ].map((o) => (
-            <label key={o.v} className={`ease flex gap-3 rounded-2xl px-4 py-3.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal ${o.v === 'auto' && !canAuto ? 'opacity-60' : 'cursor-pointer'}`}>
+            <label key={o.v} className={`ease flex gap-3 rounded-block px-4 py-3.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal ${o.v === 'auto' && !canAuto ? 'opacity-60' : 'cursor-pointer'}`}>
               <input type="radio" name="deliveryMode" value={o.v} defaultChecked={s.deliveryMode === o.v} disabled={o.v === 'auto' && !canAuto} className="mt-1 accent-teal" />
               <span>
                 <span className="font-semibold">{o.title}</span>
@@ -116,7 +116,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       {isDemoMode() && (
         <Panel className="mt-8 flex flex-wrap items-center justify-between gap-4 p-6 sm:p-7">
           <div className="min-w-0">
-            <h2 className="display text-[22px] font-bold">Demo controls</h2>
+            <h2 className="display text-section font-bold">Demo controls</h2>
             <p className="text-sm text-muted">
               The strip under the top bar for skipping ahead a day or a week, or resetting the sample data. {s.showDemoBar ? 'Showing.' : 'Hidden.'}
             </p>
@@ -131,7 +131,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       )}
 
       <Panel className="mt-8 p-6 sm:p-7">
-        <h2 className="display text-[22px] font-bold">Connections</h2>
+        <h2 className="display text-section font-bold">Connections</h2>
         <p className="text-sm text-muted">Set these up on the server (see the README). Everything works without them.</p>
         <ul className="divide-y divide-linen">
           <Connection name="Gmail or Outlook mailbox" detail="Send from your own address and see replies here automatically." status={<Chip tone="outline">Coming soon</Chip>} />
@@ -143,7 +143,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
       <Panel className="mt-8 flex flex-col gap-5 p-6 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
-            <h2 className="display text-[22px] font-bold">Account</h2>
+            <h2 className="display text-section font-bold">Account</h2>
             <p className="text-sm text-muted">{user ? <>Signed in as {user.email}</> : 'You’re trying the demo.'}</p>
           </div>
           <form action={signOutAction}>
@@ -156,7 +156,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             <span className="text-muted">Removes every customer, invoice, message and setting for good. Download your invoices first if you need them.</span>
             {error === 'confirm' && <span className="font-semibold text-rust">Type the business name exactly to confirm.</span>}
             <div className="flex flex-wrap gap-2">
-              <input name="confirm" placeholder={`Type “${business.name}” to confirm`} aria-label="Business name to confirm" className={`${field} mt-0 max-w-xs`} />
+              <input name="confirm" placeholder={`Type “${business.name}” to confirm`} aria-label="Business name to confirm" className={`h-11 max-w-xs ${FIELD}`} />
               <SubmitButton variant="danger" pendingLabel="Deleting…" confirm="Delete this business and all of its data? This can’t be undone.">Delete business</SubmitButton>
             </div>
           </form>

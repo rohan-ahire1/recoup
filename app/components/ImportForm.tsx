@@ -100,12 +100,12 @@ export function ImportForm() {
             const f = e.dataTransfer.files[0];
             if (f) await load(await f.text(), f.name);
           }}
-          className={`ease flex cursor-pointer flex-col items-center justify-center rounded-[var(--radius-panel)] border-2 border-dashed px-6 py-16 text-center ${
+          className={`ease flex cursor-pointer flex-col items-center justify-center rounded-panel border-2 border-dashed px-6 py-16 text-center ${
             dragging ? 'border-teal bg-teal-soft' : 'border-linen-2 bg-paper hover:border-faint'
           }`}
         >
           <Icon name="upload" size={28} className="text-teal" />
-          <span className="mt-3 text-lg font-semibold">{busy ? 'Reading…' : 'Drop a CSV here, or choose a file'}</span>
+          <span className="mt-3 text-base font-semibold">{busy ? 'Reading…' : 'Drop a CSV here, or choose a file'}</span>
           <span className="mt-1 max-w-md text-muted">From QuickBooks, Xero, FreshBooks, Jobber, or any spreadsheet. You’ll see exactly what happens before anything is sent.</span>
           <input
             ref={input}
@@ -118,7 +118,7 @@ export function ImportForm() {
             }}
           />
         </label>
-        {error && <p className="rounded-2xl bg-rust-soft px-4 py-3 text-sm text-rust">{error}</p>}
+        {error && <p className="rounded-block bg-rust-soft px-4 py-3 text-sm text-rust">{error}</p>}
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <button
             type="button"
@@ -143,14 +143,14 @@ export function ImportForm() {
   return (
     <div className="flex flex-col gap-5">
       {preview.missingColumns.length > 0 ? (
-        <div className="rounded-2xl bg-rust-soft px-5 py-4 text-rust">
+        <div className="rounded-block bg-rust-soft px-5 py-4 text-rust">
           <p className="font-semibold">{fileName} is missing: {preview.missingColumns.join(', ')}.</p>
           <p className="mt-1 text-sm">Rename the headers to match the template, then try again.</p>
         </div>
       ) : (
-        <div className="rounded-[var(--radius-panel)] bg-paper p-6 shadow-[var(--shadow-lift)]">
+        <div className="rounded-panel bg-paper p-6 ring-1 ring-edge ring-inset shadow-[var(--shadow-lift)]">
           <p className="text-sm text-muted">{fileName}</p>
-          <p className="display mt-1 text-[24px] leading-snug font-bold text-balance">
+          <p className="display mt-1 text-section font-bold text-balance">
             {summary.customers} customers, {summary.ready} invoices.{' '}
             {summary.overdueCount > 0 ? (
               <span className="text-teal">
@@ -177,10 +177,10 @@ export function ImportForm() {
           </div>
         </div>
       )}
-      {error && <p className="rounded-2xl bg-rust-soft px-4 py-3 text-sm text-rust">{error}</p>}
+      {error && <p className="rounded-block bg-rust-soft px-4 py-3 text-sm text-rust">{error}</p>}
 
       {preview.rows.length > 0 && (
-        <div className="overflow-hidden rounded-[var(--radius-panel)] bg-paper">
+        <div className="overflow-hidden rounded-panel bg-paper ring-1 ring-edge ring-inset">
           <div className="flex items-center justify-between px-6 pt-5 pb-2">
             <h2 className="font-semibold">{showAll ? 'Every row' : 'Open invoices and anything to check'}</h2>
             <button type="button" onClick={() => setShowAll((v) => !v)} className="text-sm font-semibold text-teal hover:underline">
