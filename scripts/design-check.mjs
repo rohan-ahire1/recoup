@@ -110,7 +110,12 @@ const DISPLAY_SIZES = 'text-money · text-title · text-heading · text-section 
 export const RULES = [
   {
     id: 'raw-colour',
-    test: (l) => /#[0-9a-fA-F]{3,8}\b(?!\})|\brgba?\(/.test(l.replace(/#\{[^}]*\}/g, '')),
+    // A hex counts where code puts a colour ([#…], '#…', fill="#…", color: #…, solid #…), so
+    // invoice numbers in copy ("invoices #2041 and #2052") don't trip it.
+    test: (l) =>
+      /(?:^|[\[('"`=]|[:,]\s*|\b(?:solid|dashed|dotted)\s+)#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b(?!\})|\brgba?\(/.test(
+        l.replace(/#\{[^}]*\}/g, ''),
+      ),
     why: 'Use a colour token (text-ink, bg-linen, var(--color-teal)…), not a raw hex or rgb().',
   },
   {
@@ -135,7 +140,7 @@ export const RULES = [
     id: 'weak-field-border',
     test: (l) =>
       /ring-line/.test(l) &&
-      (/<(input|textarea|select)\b(?![^>]*type=["'](hidden|radio|checkbox)["'])/.test(l) || /const (field|input|select)\s*=/.test(l)),
+      (/<(input|textarea|select)\b(?![^>]*type=["'](hidden|radio|checkbox)["'])/.test(l) || /\b(?:const|let)\s+\w*(?:field|input|select)\w*\s*=/i.test(l)),
     why: 'Fields use FIELD from ui.tsx (ring-field, 3.5:1). ring-line is too light to find a text box by.',
   },
   {

@@ -44,6 +44,6 @@ One stroke family: 24×24, 1.5px stroke, round caps and joins, `currentColor`.
 ## Guardrails
 `npm run check:design` (also part of `npm test` and CI) enforces this file:
 - every text/surface pairing above is checked against WCAG AA using the live values in `app/globals.css`;
-- app code may not use raw hex/rgb colours, off-scale text sizes, Tailwind's default corner sizes or raw `rounded-[…]`, `tracking-*` overrides, `ring-line` on fields, bare marigold text, faint on linen-2, paper panels without their edge, or icon strokes other than 1.5.
+- app code may not use raw hex/rgb colours (a hex where code puts a colour; "#2041" in copy is an invoice number, not a colour), off-scale text sizes, Tailwind's default corner sizes or raw `rounded-[…]`, `tracking-*` overrides, `ring-line` on fields, bare marigold text, faint on linen-2, paper panels without their edge, or icon strokes other than 1.5.
 
 Adding a new colour pairing? Add it to `PAIRS` in `scripts/design-check.mjs`. A line that genuinely must break a rule takes a `design-check-ignore` comment saying why.
