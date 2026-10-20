@@ -1,25 +1,57 @@
 # Recoup
 
-**Collections for invoices too small for collections agencies.**
+**Polite, persistent reminders for invoices too small for a collections agency.**
 
-Small businesses write off $100–$2,000 invoices because chasing them isn't worth their time. Recoup prepares a polite, persistent series of reminders for each customer, one message covering all of their overdue invoices. It stops the moment they pay, reply, promise a date, or dispute.
+Live: [recoup.rohanahire.com](https://recoup.rohanahire.com) (use "Try the demo" for a throwaway workspace)
 
-## What's in it
+## What it does
 
-- **Customers, not just invoices.** Businesses and individuals, with contacts, tags, and notes. Each customer page tells the whole story: every invoice, message, reply, promise, and payment.
-- **Payment track record.** Import paid invoices too, and Recoup works out whether this is a first slip or a pattern: *"Dana usually pays. Just a little late, now and then."*
-- **Tones.** Friendly, Professional, Concise, and Firm, each written for every step by email and text. Pick one per customer, or leave it on **Auto**: Friendly for good payers, Firm for chronic late ones. You can duplicate any tone and write your own version.
-- **Send it your way.** Recoup drafts each reminder into **To send**. Open it prefilled in Gmail, Outlook, or your mail app, open it as a text on your phone, or copy it, then mark it sent. With email sending on, reminders can go out directly or automatically.
-- **Replies that do something.** Log what a customer said: a promise pauses reminders until the date, a dispute stops them, "already paid" flags it for you, and "can I pay in parts" prepares a plan offer.
-- **Payment page** in your business's name: pay everything, or split it into 2 or 3 payments two weeks apart.
-- **Tracking.** Today view, filters (status, type, pattern, amount, age, tag) with saved views, aging, recovered by month, recovery rate by tone, customer type, and payment pattern, plus CSV export.
-- **AI (Premium).** Personalizing messages, writing new template sets, and reading replies. These show as *Premium · soon* until `ANTHROPIC_API_KEY` is set, and then they simply work.
+Small businesses often write off $100 to $2,000 invoices because chasing them isn't worth the time. Recoup takes a list of overdue invoices, groups them by customer, and prepares a short series of reminders for each one: one message per customer covering everything they owe. The series stops the moment the customer pays, replies, promises a date, or disputes.
 
-The reminder sequence runs day 1 friendly reminder → day 4 follow-up with payment link → day 8 payment link → day 15 payment-plan offer. There's never more than one message waiting, and there are always at least two days between messages.
+The reminder sequence:
 
-## Quick start
+```
+day 1   friendly reminder
+day 4   follow-up with payment link
+day 8   payment link
+day 15  payment-plan offer
+```
 
-Requires Node 22.5+ (it uses the built-in `node:sqlite`).
+There is never more than one message waiting per customer, and always at least two days between messages.
+
+## Key features
+
+- **Customers, not just invoices.** Businesses and individuals with contacts, tags and notes. Each customer page shows the full story: invoices, messages, replies, promises and payments.
+- **Payment track record.** Import paid invoices too, and Recoup works out whether this is a first slip or a habit, with a plain-English summary like *"Usually pays. Just a little late, now and then."*
+- **Four tones.** Friendly, Professional, Concise and Firm, written for every step by email and text. Pick one per customer or leave it on Auto (Friendly for good payers, Firm for chronic late ones). Any tone can be duplicated and rewritten.
+- **Send it your way.** Reminders are drafted into a **To send** queue. Open one prefilled in Gmail, Outlook or the mail app, open it as a text on your phone, or copy it, then mark it sent. With email configured, reminders can go out directly or automatically.
+- **Replies that do something.** A promise pauses reminders until that date, a dispute stops them, "already paid" flags it for review, and "can I pay in parts" prepares a plan offer.
+- **Customer payment page** in the business's name, showing how to pay (instructions or the business's own payment link) and letting the customer split the balance into 2 or 3 payments two weeks apart. Recoup never handles the money itself.
+- **QuickBooks Online sync** (read-only). Customers and invoices sync hourly; a payment recorded in QuickBooks stops reminders.
+- **Reports.** Today view, filters (status, type, payment pattern, amount, age, tag) with saved views, aging, recovered by month, recovery rate by tone, and CSV export.
+- **Optional AI features** using the Anthropic API: personalizing a message from the customer's history, writing a new tone from a description, and reading a pasted reply to classify it (paid, promise with date, dispute, and so on). Hidden until `ANTHROPIC_API_KEY` is set.
+
+## Tech stack
+
+- Next.js 15 (App Router, server actions), React 19, TypeScript
+- Tailwind CSS v4
+- SQLite through Node's built-in `node:sqlite` (Node 22.5+)
+- Resend for email, QuickBooks Online OAuth, Anthropic SDK
+- Vitest; GitHub Actions runs typecheck, tests and build on every push
+- Deployed on a single Linux server with systemd and Caddy
+
+## Architecture notes
+
+- **The reminder engine is a pure function.** `lib/sequence.ts` takes a case, its history and a clock, and returns what to prepare next. Each action has an idempotency key so it is prepared at most once, which makes the engine easy to test and safe to re-run from the scheduler.
+- **One database per business.** Accounts and sessions live in `accounts.db`; each business gets its own `tenants/<id>.db`. The current business is carried in `AsyncLocalStorage` (`lib/tenant.ts`), so library code never takes a business id argument and can't be pointed at the wrong tenant by mistake.
+- **Passwordless sign-in** with single-use email links and HTTP-only session cookies.
+- **Secrets at rest.** QuickBooks tokens are encrypted with AES-256-GCM (`lib/secret-box.ts`). Resend webhooks are verified with an HMAC signature and a five-minute replay window (`lib/svix.ts`).
+- **Safe email sending.** A daily cap per business, and automatic sending pauses itself after too many bounces or spam complaints.
+- **Demo workspaces** replay a sample business through the real engine, with controls to jump ahead a day or a week. They never send real email and are deleted after 3 days.
+
+## Run it locally
+
+Requires Node 22.5 or newer.
 
 ```bash
 npm install
@@ -27,82 +59,92 @@ npm run seed   # a sample business with 14 customers and five months of history
 npm run dev    # http://localhost:4310
 ```
 
-With no keys set, it runs in **demo mode**. Nothing is really sent, payment pages use test mode, and the strip under the navigation lets you jump ahead a day or a week, or reset the demo.
+With no keys set, it runs in demo mode: nothing is really sent, and a strip under the navigation lets you move time forward or reset the demo.
+
+Other scripts:
+
+```bash
+npm test           # vitest
+npm run typecheck
+npm run build && npm start
+```
 
 ### Things to try
 
-1. **Today** shows 4 reminders ready and 2 customers who need you.
+1. **Today** shows the reminders that are ready and the customers who need you.
 2. Open **Harbor Street Bakery**. Read the story, switch the tone, open the draft in Gmail, then **Mark as sent**.
-3. Open **Oak & Anvil Kitchen**, then use **Payment page** → *Open*, and choose *3 payments*.
-4. Log a reply on **Riverside Yoga Studio**: *Promised to pay* holds reminders until the date.
-5. **Customers**: filter by *Often late* or *Over $500*, then save the view.
-6. **Import**: *Try a sample file* to see the preview with history.
+3. Open **Oak & Anvil Kitchen**, open its **Payment page**, and choose *3 payments*.
+4. Log a reply on **Riverside Yoga Studio**: *Promised to pay* holds reminders until that date.
+5. On **Customers**, filter by *Often late* or *Over $500* and save the view.
+6. On **Import**, use *Try a sample file* to see the preview.
+
+### Environment variables
+
+Everything is optional in development. Copy `.env.example` to `.env` and fill in only what you need.
+
+| What | Variables |
+| --- | --- |
+| Public URL for links and sign-in emails | `PUBLIC_BASE_URL` |
+| Scheduler (`POST /api/cron/run` every 15 minutes) | `CRON_SECRET` |
+| Email via Resend | `RESEND_API_KEY`, `EMAIL_FROM`, `AUTH_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET`, `EMAIL_DAILY_CAP` |
+| QuickBooks Online | `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`, `QUICKBOOKS_ENVIRONMENT`, `TOKEN_ENCRYPTION_KEY` |
+| AI features | `ANTHROPIC_API_KEY` |
+| Error alerts (ntfy) | `NTFY_URL` |
+| Contact shown on Privacy and Terms | `SUPPORT_EMAIL` |
+| Where databases live | `DATA_DIR` (default `./data`) |
+
+Without email keys, sign-in links are printed to the server log.
 
 ## Import format
 
 `Customer, Type, Contact, Email, Phone, Tags, Invoice, Description, Amount, Issued, Due, Paid`
 
-- Only **Customer, Invoice, Amount, Due** and **Email or Phone** are required. Common header names (Client, Balance, Due Date, and so on) are recognized.
+- Only **Customer, Invoice, Amount, Due** and **Email or Phone** are required. Common header names (Client, Balance, Due Date and so on) are recognized.
 - **Due** is a date or days late (`32d`).
-- **Paid** is the date an invoice was paid. Leave it empty for unpaid invoices. Paid rows build the track record and are never chased.
-- Overdue-only files work too; add history later.
+- **Paid** is the date an invoice was paid. Paid rows build the track record and are never chased.
 - Up to 5 MB and 10,000 rows per file.
-
-## Going live
-
-| What | Variables | Notes |
-| --- | --- | --- |
-| AI features | `ANTHROPIC_API_KEY` | Uses Claude Opus 5, with the server-side refusal fallback. |
-| Email sending (Resend) | `RESEND_API_KEY`, `EMAIL_FROM` | One shared sender for every business: "Harbor Bakery via Recoup <`EMAIL_FROM`>", replies to the business. Enables **Send now** and **Send automatically**. A business can verify its own domain in Settings. |
-| Bounces and complaints | `RESEND_WEBHOOK_SECRET` | Point a Resend webhook (`email.bounced`, `email.complained`) at `/api/webhooks/resend`. Bounces flag the customer; too many pause that business's automatic email. |
-| Daily cap | `EMAIL_DAILY_CAP` | Automatic emails per business per day. Default 200. |
-| QuickBooks Online | `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`, `QUICKBOOKS_ENVIRONMENT`, `TOKEN_ENCRYPTION_KEY` | Read-only. Register `/api/quickbooks/callback` as the redirect URI and `/api/quickbooks/disconnected` as the disconnect URL. Syncs on connect, then hourly from the scheduler; a payment in QuickBooks stops reminders. Tokens are encrypted with `TOKEN_ENCRYPTION_KEY`. |
-| Links | `PUBLIC_BASE_URL` | Used in payment links and sign-in emails. |
-| Sign-in emails | `AUTH_EMAIL_FROM` | Sender address for sign-in links (with `RESEND_API_KEY`). Required in production. |
-| Alerts | `NTFY_URL` | An ntfy topic URL. Unexpected server errors and scheduler problems send a push, at most once per 30 minutes per error. |
-| Support contact | `SUPPORT_EMAIL` | Shown on the Privacy and Terms pages. |
-| Health | | `GET /api/health` is 200 when the accounts and business databases answer. |
-| Scheduler | `CRON_SECRET` | Call `POST /api/cron/run` every 15 minutes (`Authorization: Bearer …`). |
-
-Demo controls only exist in demo workspaces ("Try the demo" on the home page). They never send real email and are deleted after 3 days.
 
 ## Running it on a server
 
-Files in `deploy/` describe the production setup on one Linux server behind Caddy:
+`deploy/` holds the production setup for one Linux server behind Caddy:
 
-- `recoup.service` runs the app on 127.0.0.1:8793. Keys go in `~/.config/recoup/server.env` (see `.env.example`); data lives in `data/`.
-- `recoup-cron.timer` runs `scripts/cron.sh` every 15 minutes, which POSTs `/api/cron/run` locally with `CRON_SECRET`.
-- `recoup-backup.timer` runs `scripts/backup-db.sh` nightly: a `VACUUM INTO` copy of every database into `~/backups/recoup/<date>/`, checked and kept 14 days. To restore a business, stop the app and copy its `tenants/<id>.db` back into `data/tenants/`.
-- `Caddyfile.recoup` is the site block: `/api/cron` is closed from outside, and of the webhooks only `/api/webhooks/resend` is open.
+- `recoup.service` runs the app on 127.0.0.1:8793 with keys from `~/.config/recoup/server.env`.
+- `recoup-cron.timer` calls the scheduler every 15 minutes.
+- `recoup-backup.timer` takes a nightly `VACUUM INTO` copy of every database, checks it, and keeps 14 days.
+- `Caddyfile.recoup` closes `/api/cron` to the outside and only exposes the Resend webhook.
 
-Deploy with `scripts/deploy.sh` on the server. It pulls main, installs, builds, restarts and checks `/api/health`, and goes back to the previous commit if the new one isn't healthy. Logs: `journalctl -u recoup`, `journalctl -u recoup-cron`, `journalctl -u recoup-backup`.
+`scripts/deploy.sh` pulls `main`, installs, builds, restarts, checks `/api/health`, and rolls back to the previous commit if the new one isn't healthy.
 
 ## Project layout
 
 ```
-lib/sequence.ts   The engine: pure function from (case, history, clock) to what to prepare next
-lib/service.ts    Import, runner, drafts, replies, payments, plans, reports
-lib/history.ts    Track record and plain-English summaries
-lib/tones.ts      The four built-in tones
-lib/compose.ts    Gmail / Outlook / mailto / sms links
-lib/ai.ts         Premium AI features (Anthropic SDK)
-lib/quickbooks.ts QuickBooks Online sign-in and invoice sync
-lib/email.ts      Reminder sender, daily cap, bounces and complaints, own domains
-lib/sample.ts     Demo business, replayed through the real engine
-app/(app)/        Today, Customers, Invoices, To send, Templates, Reports, Settings, Import
-app/pay/[token]/  Customer-facing payment page
-tests/            Engine, import, history, templates, webhooks, and end-to-end service tests
-PRODUCT.md, DESIGN.md   Product truth and the "Front desk" design system
+lib/sequence.ts    Reminder engine: (case, history, clock) -> next action
+lib/service.ts     Import, runner, drafts, replies, payments, plans, reports
+lib/history.ts     Track record and plain-English summaries
+lib/tones.ts       The four built-in tones
+lib/compose.ts     Gmail / Outlook / mailto / sms links
+lib/tenant.ts      Per-business database selection
+lib/quickbooks.ts  QuickBooks Online sign-in and invoice sync
+lib/email.ts       Sender, daily cap, bounces and complaints, custom domains
+lib/ai.ts          Optional AI features
+app/(app)/         Today, Customers, Invoices, To send, Templates, Reports, Settings, Import
+app/pay/[token]/   Customer-facing payment page
+tests/             Engine, import, history, tenants, email, webhooks, QuickBooks, service
 ```
+
+`PRODUCT.md` and `DESIGN.md` describe the product rules and the design system.
 
 ## Compliance notes
 
 *Not legal advice.*
 
-- **Texts:** automated texts need prior consent (TCPA). STOP always works. Recoup never sends texts itself: they open on the business's own phone.
-- **FDCPA:** it mostly governs third-party collectors. Recoup sends everything in the business's own name. Running it as a service that collects *for* other businesses changes that. State laws vary.
-- **Tone:** built-in templates never threaten or mention agencies, credit, or legal action. The AI is instructed the same way.
+- **Texts:** Recoup never sends texts itself; they open on the business's own phone. STOP always works.
+- **FDCPA:** it mainly governs third-party collectors. Recoup sends everything in the business's own name.
+- **Tone:** built-in templates never threaten or mention agencies, credit reporting or legal action, and the AI is instructed the same way.
 
 ## Known gaps
 
-See PRODUCT.md.
+- Replies are logged by hand; Gmail/Outlook mailbox sync isn't built.
+- Missed plan installments aren't chased yet.
+- QuickBooks is the only accounting integration.
+- One server with SQLite; running several servers would need Postgres.
