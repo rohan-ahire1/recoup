@@ -1,5 +1,5 @@
 # The recoup block in /etc/caddy/Caddyfile. The app sets its own security headers.
-recoup.rohanahire.com {
+recoup.rohanahire.com, recoup.goodshigoto.com {
 	encode zstd gzip
 
 	header {
@@ -21,6 +21,18 @@ recoup.rohanahire.com {
 	handle @closedHooks {
 		respond "Not found" 404
 	}
+
+	# Signed-out visitors to / get the landing page. Done here because the app's
+	# middleware rewrite turns into an https self-proxy behind Caddy and fails.
+	@landing {
+		path /
+		not header Cookie *recoup_session=*
+	}
+	rewrite @landing /home
+
+	# Old link to the first demo.
+	redir /explore / 301
+	redir /explore/ / 301
 
 	handle {
 		reverse_proxy 127.0.0.1:8793
