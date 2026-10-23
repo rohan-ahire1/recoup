@@ -42,8 +42,8 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-10">
           <Link href="/" className="display text-heading font-bold text-teal">recoup</Link>
           <nav className="flex items-center gap-1">
-            <a href="#how" className={`${buttonClass('ghost', 'sm')} hidden sm:inline-flex`}>How it works</a>
-            <a href="#who" className={`${buttonClass('ghost', 'sm')} hidden sm:inline-flex`}>Who it’s for</a>
+            <a href="#how" className={`${buttonClass('ghost', 'sm')} max-sm:hidden`}>How it works</a>
+            <a href="#who" className={`${buttonClass('ghost', 'sm')} max-sm:hidden`}>Who it’s for</a>
             <Link href="/login" className={buttonClass('ghost', 'sm')}>Sign in</Link>
             <Link href="/login" className={buttonClass('primary', 'sm')}>Start free</Link>
           </nav>
