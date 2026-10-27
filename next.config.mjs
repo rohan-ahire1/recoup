@@ -4,7 +4,6 @@ const isProd = process.env.NODE_ENV === 'production';
 const securityHeaders = [
   { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
-  { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
   // The dev server needs eval for fast refresh, so the policy only applies to production builds.
@@ -18,7 +17,8 @@ const securityHeaders = [
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
       "connect-src 'self'",
-      "frame-ancestors 'none'",
+      // The portfolio desktop at rohanahire.com opens Recoup in a window; nothing else may frame it.
+      "frame-ancestors https://rohanahire.com http://localhost:3104 http://127.0.0.1:3104",
       "base-uri 'self'",
       // Server actions post to this origin; the QuickBooks sign-in is a plain link.
       "form-action 'self'",
