@@ -86,7 +86,7 @@ Everything is optional in development. Copy `.env.example` to `.env` and fill in
 | --- | --- |
 | Public URL for links and sign-in emails | `PUBLIC_BASE_URL` |
 | Scheduler (`POST /api/cron/run` every 15 minutes) | `CRON_SECRET` |
-| Email via Resend | `RESEND_API_KEY`, `EMAIL_FROM`, `AUTH_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET`, `EMAIL_DAILY_CAP` |
+| Email via Resend | `RESEND_API_KEY`, `EMAIL_FROM`, `AUTH_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET`, `EMAIL_DAILY_CAP` (default 200), `NEW_ACCOUNT_DAILY_CAP` (default 20 a day for accounts younger than `NEW_ACCOUNT_DAYS`, default 14, until they verify their own domain) |
 | QuickBooks Online | `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`, `QUICKBOOKS_ENVIRONMENT`, `TOKEN_ENCRYPTION_KEY` |
 | AI features | `ANTHROPIC_API_KEY`, `TYPESAFE_API_KEY` (optional, Jev sorts replies), `AI_MONTHLY_CAP` (AI calls per business per month, default 300) |
 | Error alerts (ntfy) | `NTFY_URL` |
