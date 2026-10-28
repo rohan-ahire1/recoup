@@ -89,6 +89,56 @@ describe('demo workspaces', () => {
   });
 });
 
+describe('the live demo cap', () => {
+  // Far enough ahead that demos made by other tests have expired.
+  const T1 = Date.parse('2031-01-01T12:00:00Z');
+  const MIN = 60_000;
+
+  it('counts only demos that have not expired', () => {
+    const before = a.countLiveDemos(T1);
+    const demo = a.createBusiness({ name: 'Counted', demo: true }, T1);
+    a.createBusiness({ name: 'Real Co' }, T1);
+    expect(a.countLiveDemos(T1 + 1)).toBe(before + 1);
+    expect(a.countLiveDemos(T1 + a.DEMO_TTL + 1)).toBe(0);
+    a.deleteBusiness(demo.id);
+  });
+
+  it('removes the oldest idle demo to make room for a third', () => {
+    const t = T1 + 10 * a.DEMO_TTL;
+    const expired = a.createBusiness({ name: 'Expired', demo: true }, t - a.DEMO_TTL - 1);
+    const idle = a.createBusiness({ name: 'Idle', demo: true }, t);
+    const busy = a.createBusiness({ name: 'Busy', demo: true }, t + MIN);
+    runAsBusiness(a.tenantOf(idle), () => repo.listCustomers());
+    a.createSession({ businessId: idle.id }, t);
+    const busySession = a.createSession({ businessId: busy.id }, t + MIN);
+    expect(a.getSession(busySession, t + 80 * MIN)).toBeTruthy();
+
+    expect(a.makeRoomForDemo(2, t + 90 * MIN)).toEqual({ ok: true, full: true });
+    expect(a.getBusiness(expired.id)).toBeUndefined();
+    expect(a.getBusiness(idle.id)).toBeUndefined();
+    expect(fs.existsSync(businessDbFile(idle.id))).toBe(false);
+    expect(a.getBusiness(busy.id)).toBeTruthy();
+    expect(a.countLiveDemos(t + 90 * MIN)).toBe(1);
+    a.deleteBusiness(busy.id);
+  });
+
+  it('refuses cleanly when every demo is in use', () => {
+    const t = T1 + 20 * a.DEMO_TTL;
+    const one = a.createBusiness({ name: 'One', demo: true }, t);
+    const two = a.createBusiness({ name: 'Two', demo: true }, t + 50 * MIN);
+    const s1 = a.createSession({ businessId: one.id }, t);
+    // Two has no session, but it's less than an hour old.
+    expect(a.getSession(s1, t + 70 * MIN)).toBeTruthy();
+
+    expect(a.makeRoomForDemo(2, t + 90 * MIN)).toEqual({ ok: false, full: true });
+    expect(a.getBusiness(one.id)).toBeTruthy();
+    expect(a.getBusiness(two.id)).toBeTruthy();
+    expect(a.makeRoomForDemo(3, t + 90 * MIN)).toEqual({ ok: true, full: false });
+    a.deleteBusiness(one.id);
+    a.deleteBusiness(two.id);
+  });
+});
+
 describe('deleting a business', () => {
   it('removes its rows, data file and payment links', async () => {
     const b = a.createBusiness({ name: 'Gone Co' });
