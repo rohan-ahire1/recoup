@@ -29,6 +29,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   delete process.env.EMAIL_DAILY_CAP;
+  delete process.env.NEW_ACCOUNT_DAYS;
+  delete process.env.NEW_ACCOUNT_DAILY_CAP;
 });
 
 const CSV = 'Customer,Email,Invoice,Amount,Due\nDana,dana@x.co,#1,100,2026-01-01\nEli,eli@x.co,#2,200,2026-01-01\nFay,fay@x.co,#3,300,2026-01-01';
@@ -67,6 +69,65 @@ describe('the shared sender', () => {
       saveSettings({ businessName: 'Own Domain Co.', replyToEmail: 'me@own.test' });
       expect(email.senderFor(b.id, getSettings())).toEqual({ from: 'Own Domain Co <billing@own.test>', replyTo: 'me@own.test' });
     });
+  });
+});
+
+describe('the new-account cap', () => {
+  const DAY = 86_400_000;
+  const now = Date.now();
+  let capId = 0;
+  /** Record `n` emails sent in the last day without going through a provider. */
+  function sentToday(businessId: string, n: number) {
+    for (let i = 0; i < n; i++) a.recordSentEmail(`cap_${++capId}`, businessId, now - 60_000);
+  }
+
+  it('caps a business created today at 20 a day, and says why', () => {
+    const b = a.createBusiness({ name: 'Brand New Co' }, now);
+    expect(email.dailyLimit(b.id, now)).toEqual({ cap: 20, risesAt: now + 14 * DAY });
+    sentToday(b.id, 19);
+    expect(email.sendingBlocked(b.id, now)).toBeNull();
+    sentToday(b.id, 1);
+    expect(email.sendingBlocked(b.id, now)).toBe(
+      'Daily limit of 20 emails reached. New accounts can send 20 automatic emails a day for their first 14 days. Verify your own sending domain in Settings to lift this.',
+    );
+  });
+
+  it('holds back the 21st automatic email of a new business’s first day', async () => {
+    const b = a.createBusiness({ name: 'Busy First Day' });
+    sentToday(b.id, 19);
+    await runAsBusiness(a.tenantOf(b), async () => {
+      saveSettings({ businessName: 'Busy First Day', replyToEmail: 'owner@busy.test', mailingAddress: '2 Main St', deliveryMode: 'auto' });
+      await svc.importCsv(CSV);
+      const statuses = repo.listCustomers().flatMap((c) => repo.listCustomerMessages(c.id).map((m) => m.status));
+      expect(statuses.sort()).toEqual(['ready', 'ready', 'sent']);
+    });
+    expect(sent).toHaveLength(1);
+    expect(email.sendingBlocked(b.id)).toMatch(/^Daily limit of 20 emails reached\. New accounts/);
+  });
+
+  it('gives a 15-day-old business the normal 200', () => {
+    const b = a.createBusiness({ name: 'Two Weeks Co' }, now - 15 * DAY);
+    expect(email.dailyLimit(b.id, now)).toEqual({ cap: 200 });
+    sentToday(b.id, 20);
+    expect(email.sendingBlocked(b.id, now)).toBeNull();
+  });
+
+  it('gives a new business with its own verified domain the normal 200', () => {
+    const b = a.createBusiness({ name: 'Verified New Co' }, now);
+    a.saveEmailDomain({ businessId: b.id, fromEmail: 'billing@verified.test', domain: 'verified.test', resendId: 'd_new', status: 'verified', records: [] });
+    expect(email.dailyLimit(b.id, now)).toEqual({ cap: 200 });
+  });
+
+  it('reads its limits from the environment', () => {
+    process.env.NEW_ACCOUNT_DAYS = '30';
+    process.env.NEW_ACCOUNT_DAILY_CAP = '5';
+    process.env.EMAIL_DAILY_CAP = '50';
+    const fresh = a.createBusiness({ name: 'Env Fresh Co' }, now - 20 * DAY);
+    const old = a.createBusiness({ name: 'Env Old Co' }, now - 31 * DAY);
+    expect(email.dailyLimit(fresh.id, now)).toEqual({ cap: 5, risesAt: now + 10 * DAY });
+    expect(email.dailyLimit(old.id, now)).toEqual({ cap: 50 });
+    sentToday(fresh.id, 5);
+    expect(email.sendingBlocked(fresh.id, now)).toMatch(/^Daily limit of 5 emails reached\. New accounts can send 5 automatic emails a day for their first 30 days\./);
   });
 });
 
