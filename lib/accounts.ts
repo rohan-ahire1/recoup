@@ -103,6 +103,15 @@ CREATE TABLE quickbooks_connections (
   last_error TEXT
 );
 `,
+  `
+-- AI calls per business per calendar month (UTC, 'YYYY-MM'), for the monthly cap in lib/ai.ts.
+CREATE TABLE ai_usage (
+  business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  month TEXT NOT NULL,
+  calls INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (business_id, month)
+);
+`,
 ];
 
 const MINUTE = 60_000;
@@ -347,6 +356,25 @@ export function pauseBusinessEmail(businessId: string, reason: string, now = Dat
 
 export function resumeBusinessEmail(businessId: string) {
   adb().prepare('UPDATE businesses SET email_paused_at = NULL, email_paused_reason = NULL WHERE id = ?').run(businessId);
+}
+
+// ---------------------------------------------------------------- AI usage
+
+/** Counts one AI call for the month unless the business already made `cap`. True if it was counted. */
+export function takeAiCall(businessId: string, month: string, cap: number): boolean {
+  if (cap < 1) return false;
+  const r = adb()
+    .prepare(
+      `INSERT INTO ai_usage (business_id, month, calls) VALUES (?, ?, 1)
+       ON CONFLICT(business_id, month) DO UPDATE SET calls = calls + 1 WHERE calls < ? RETURNING calls`,
+    )
+    .get(businessId, month, cap);
+  return r !== undefined;
+}
+
+export function aiCallsThisMonth(businessId: string, month: string): number {
+  const r = adb().prepare('SELECT calls FROM ai_usage WHERE business_id = ? AND month = ?').get(businessId, month) as { calls: number } | undefined;
+  return r?.calls ?? 0;
 }
 
 // ---------------------------------------------------------------- QuickBooks
