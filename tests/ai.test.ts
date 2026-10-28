@@ -1,4 +1,13 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// AI calls are counted per business, so these run as a throwaway one.
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'recoup-ai-'));
+const { enterBusiness } = await import('../lib/tenant');
+const accounts = await import('../lib/accounts');
+enterBusiness(accounts.tenantOf(accounts.createBusiness({ name: 'AI test' })));
 
 // Claude is mocked: each test queues the JSON it should "write".
 const { create } = vi.hoisted(() => ({ create: vi.fn() }));
