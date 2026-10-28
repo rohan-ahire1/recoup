@@ -53,7 +53,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ d
       <main>
         <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-10">
           {q.deleted && <Notice>Your business and all its data have been deleted.</Notice>}
-          {q.error && <Notice tone="rust">Too many demos from here. Please try again later.</Notice>}
+          {q.error && (
+            <Notice tone="rust">
+              {q.error === 'busy' ? 'Demos are busy right now. Try again in a few minutes.' : 'Too many demos from here. Please try again later.'}
+            </Notice>
+          )}
         </div>
 
         {/* Hero */}

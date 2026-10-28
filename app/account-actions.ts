@@ -11,10 +11,13 @@ import {
   deleteBusiness,
   deleteSession,
   findOrCreateUser,
+  makeRoomForDemo,
+  maxLiveDemos,
   renameBusiness,
   setSessionBusiness,
   tenantOf,
 } from '@/lib/accounts';
+import { alert } from '@/lib/alert';
 import { clearSessionCookie, currentSession, requireBusiness, requireSession, setSessionCookie } from '@/lib/auth';
 import { normalizeEmail } from '@/lib/csv';
 import { removeOwnDomain } from '@/lib/email';
@@ -118,6 +121,11 @@ export async function deleteBusinessAction(form: FormData) {
 
 export async function startDemoAction() {
   if (!allow(`demo:ip:${await clientIp()}`, 10, 60 * MINUTE)) redirect('/?error=slow');
+  if (!allow('demo:global', 60, 10 * MINUTE)) redirect('/?error=busy');
+  const max = maxLiveDemos();
+  const room = makeRoomForDemo(max);
+  if (room.full) void alert('Demo cap reached', `${max} live demos (MAX_LIVE_DEMOS). Expired and idle demos are removed to make room; new ones are refused while all are in use.`);
+  if (!room.ok) redirect('/?error=busy');
   const business = createBusiness({ name: 'Ferro Service Co.', demo: true });
   const { seedDemo } = await import('@/lib/sample');
   await runAsBusiness(tenantOf(business), () => seedDemo());
