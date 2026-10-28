@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { TemplateKey } from './sequence';
 import type { MessageTemplate, TemplateSetContent } from './tones';
+import { asChoice, askJev, jevEnabled, type ChoiceAnswer } from './jev';
 import type { ReplyKind } from './types';
 
 /**
@@ -100,6 +101,8 @@ ${JSON.stringify(example)}`;
   return Object.fromEntries(keys.map((k) => [k, out[`step_${k}`]])) as TemplateSetContent;
 }
 
+type ReplyRead = { kind: Exclude<ReplyKind, 'stop'>; promiseDate: string | null; summary: string };
+
 const replySchema = {
   type: 'object',
   properties: {
@@ -111,13 +114,73 @@ const replySchema = {
   additionalProperties: false,
 };
 
-/** Read a customer's reply: a promise (with a date), a claim they paid, a dispute, a plan request, or other. */
-export async function classifyReply(text: string, today: string): Promise<{ kind: Exclude<ReplyKind, 'stop'>; promiseDate: string | null; summary: string }> {
+const sortSystem = (today: string) =>
+  'You sort customer replies to payment reminders for a small business. Today is ' + today + '. Resolve relative dates like "Friday" to the next such date.';
+
+/** The whole read done by Claude. Used when Jev is not configured or fails. */
+async function classifyWithClaude(text: string, today: string): Promise<ReplyRead> {
   const out = await jsonCall<{ kind: Exclude<ReplyKind, 'stop'>; promise_date: string | null; summary: string }>(
-    'You sort customer replies to payment reminders for a small business. Today is ' + today + '. Resolve relative dates like "Friday" to the next such date.',
+    sortSystem(today),
     `Customer reply:\n"""${text}"""`,
     replySchema,
     1000,
   );
   return { kind: out.kind, promiseDate: out.promise_date, summary: out.summary };
+}
+
+/** Below this Jev confidence the reply goes to the owner as "other" (needs you) instead of being acted on. */
+export const REPLY_CONFIDENCE_THRESHOLD = 0.85;
+
+const KIND_CRITERIA: Record<Exclude<ReplyKind, 'stop'>, string> = {
+  promise: 'The customer commits to paying, now or by a certain day or date',
+  paid: 'The customer says they have already paid or sent the payment',
+  dispute: 'The customer disagrees with the invoice: the amount, the work, or whether they owe it',
+  plan: 'The customer asks to pay in parts, installments, or on a payment plan',
+  other: 'Anything else: a question, a request for a copy of the invoice, an unclear or unrelated message',
+};
+
+/** Jev's choice answer -> a reply kind, sending low-confidence or unknown answers to the owner. */
+export function kindFromChoice(answer: ChoiceAnswer): { kind: Exclude<ReplyKind, 'stop'>; unsure: boolean } {
+  const known = answer.choice in KIND_CRITERIA;
+  if (!known || !(answer.confidence >= REPLY_CONFIDENCE_THRESHOLD)) return { kind: 'other', unsure: true };
+  return { kind: answer.choice as Exclude<ReplyKind, 'stop'>, unsure: false };
+}
+
+const detailSchema = {
+  type: 'object',
+  properties: {
+    promise_date: { type: ['string', 'null'], description: 'YYYY-MM-DD the customer promised to pay by, or null' },
+    summary: { type: 'string', description: 'One short sentence for the business owner' },
+  },
+  required: ['promise_date', 'summary'],
+  additionalProperties: false,
+};
+
+/** Read a customer's reply: a promise (with a date), a claim they paid, a dispute, a plan request, or other. */
+export async function classifyReply(text: string, today: string): Promise<ReplyRead> {
+  // Jev picks the kind. If it isn't set up or fails, Claude does the whole read as before.
+  if (!jevEnabled()) return classifyWithClaude(text, today);
+  let read: { kind: Exclude<ReplyKind, 'stop'>; unsure: boolean };
+  try {
+    const res = await askJev(`Customer reply to a payment reminder:\n${text}`, {
+      kind: { type: 'choice', instructions: 'What does this customer reply to an overdue-invoice reminder mean?', criteria: KIND_CRITERIA },
+    });
+    read = kindFromChoice(asChoice(res.answers.kind, 'kind'));
+  } catch (err) {
+    console.warn('[ai] Jev failed, using Claude for the reply:', err instanceof Error ? err.message : err);
+    return classifyWithClaude(text, today);
+  }
+
+  // A plan request needs neither a date nor a summary: the app logs fixed text for it.
+  if (read.kind === 'plan') return { kind: 'plan', promiseDate: null, summary: 'Asked about paying in parts.' };
+
+  // Jev can't write text, so Claude writes the one-line summary (shown on the timeline and Today) and the promise date.
+  const out = await jsonCall<{ promise_date: string | null; summary: string }>(
+    sortSystem(today),
+    `Customer reply:\n"""${text}"""\n\n${read.kind === 'promise' ? 'They promised to pay. Give the date they promised as YYYY-MM-DD, or null if they gave none.' : 'Return null for promise_date.'} Write a one-sentence summary for the owner.`,
+    detailSchema,
+    500,
+  );
+  if (read.unsure) return { kind: 'other', promiseDate: null, summary: `Not sure what this means, please check: ${out.summary}` };
+  return { kind: read.kind, promiseDate: read.kind === 'promise' ? out.promise_date : null, summary: out.summary };
 }
