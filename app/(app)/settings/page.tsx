@@ -12,8 +12,8 @@ import { SubmitButton } from '@/app/components/SubmitButton';
 import { buttonClass, Chip, FIELD, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
 import { aiEnabled, aiUsage } from '@/lib/ai';
 import { getEmailDomain, getQuickBooks, getUser } from '@/lib/accounts';
-import { dailyCap, senderFor } from '@/lib/email';
-import { relativeTime } from '@/lib/format';
+import { dailyCap, dailyLimit, senderFor } from '@/lib/email';
+import { formatDate, relativeTime } from '@/lib/format';
 import { quickBooksConfigured } from '@/lib/quickbooks';
 import { requireBusiness, requireSession } from '@/lib/auth';
 import { isDemoMode, providerStatus } from '@/lib/providers';
@@ -62,6 +62,7 @@ export default async function SettingsPage({
   const canAuto = p.email !== 'mock';
   const sender = senderFor(business.id, s);
   const domain = getEmailDomain(business.id);
+  const limit = dailyLimit(business.id);
   const qbo = getQuickBooks(business.id);
   const qbNotice = qb ? QB_NOTICES[qb] : undefined;
   const ai = aiEnabled() ? aiUsage(business.id) : null;
@@ -171,7 +172,7 @@ export default async function SettingsPage({
           )}
           {[
             { v: 'prepare', title: 'I’ll send them myself', detail: 'Recoup drafts each reminder. You open it in Gmail, Outlook, your mail app or your phone, and press send.' },
-            { v: 'auto', title: 'Send automatically', detail: canAuto ? `Emails go out on their own, up to ${dailyCap()} a day. Texts still open on your phone for you to send.` : 'Email sending isn’t set up on this server yet.' },
+            { v: 'auto', title: 'Send automatically', detail: canAuto ? `Emails go out on their own, up to ${limit.cap} a day. Texts still open on your phone for you to send.` : 'Email sending isn’t set up on this server yet.' },
           ].map((o) => (
             <label key={o.v} className={`ease flex gap-3 rounded-block px-4 py-3.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal ${o.v === 'auto' && !canAuto ? 'opacity-60' : 'cursor-pointer'}`}>
               <input type="radio" name="deliveryMode" value={o.v} defaultChecked={s.deliveryMode === o.v} disabled={o.v === 'auto' && !canAuto} className="mt-1 accent-teal" />
@@ -196,6 +197,10 @@ export default async function SettingsPage({
             <p className="text-muted">
               Automatic emails come from <span className="font-semibold text-ink break-all">{sender.from}</span>
               {sender.replyTo ? <>, and replies go to <span className="font-semibold text-ink">{sender.replyTo}</span></> : '. Add a reply-to email above so replies reach you'}.
+            </p>
+            <p className="mt-2 text-muted">
+              You can send up to <span className="font-semibold text-ink">{limit.cap} automatic emails a day</span>
+              {limit.risesAt ? <>. That rises to {dailyCap()} on {formatDate(limit.risesAt, s.timezone)}, or as soon as you verify your own address below</> : ''}.
             </p>
           </div>
           {domainError && <p className="font-semibold text-rust">{domainError}</p>}

@@ -2,9 +2,11 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ColumnChart } from '@/app/components/ColumnChart';
 import { Icon } from '@/app/components/icons';
-import { Avatar, BigMoney, ButtonLink, Panel, StatePill } from '@/app/components/ui';
+import { Avatar, BigMoney, ButtonLink, Panel, SendingHold, StatePill } from '@/app/components/ui';
 import { requireBusiness } from '@/lib/auth';
+import { sendingBlocked } from '@/lib/email';
 import { CASE_LABELS, formatDateLong, formatDateTime, money, moneyShort, plural } from '@/lib/format';
+import { providerStatus } from '@/lib/providers';
 import { listInstallments, listMessagesByStatus } from '@/lib/repo';
 import { STEPS } from '@/lib/sequence';
 import { allCustomerSummaries, breakdowns, overview, type CustomerState } from '@/lib/service';
@@ -47,7 +49,7 @@ function Metric({ label, value, sub, tone }: { label: string; value: React.React
 }
 
 export default async function Today() {
-  enterBusiness(await requireBusiness());
+  const { business } = enterBusiness(await requireBusiness());
   const now = getNow();
   const { timezone, senderName } = getSettings();
   const o = overview(now);
@@ -55,6 +57,7 @@ export default async function Today() {
   const summaries = allCustomerSummaries(now);
   const byId = new Map(summaries.map((s) => [s.customer.id, s]));
   const ready = listMessagesByStatus(['ready']);
+  const hold = providerStatus().email !== 'mock' ? sendingBlocked(business.id) : null;
   const needsYou = summaries.filter((s) => s.openCase?.needsAttention || s.state === 'disputed' || s.state === 'needs_you');
 
   if (summaries.length === 0) {
@@ -270,6 +273,11 @@ export default async function Today() {
               </Link>
             )}
           </div>
+          {hold && (
+            <div className="mb-4">
+              <SendingHold reason={hold} />
+            </div>
+          )}
           {ready.length === 0 ? (
             <p className="text-muted">You’re all caught up. New reminders appear here when they’re due.</p>
           ) : (

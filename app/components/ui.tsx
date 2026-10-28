@@ -218,6 +218,16 @@ export function Empty({ title, children, action }: { title: string; children?: R
   );
 }
 
+/** Why automatic email is held back right now, from `sendingBlocked`. Renders nothing when it isn't. */
+export function SendingHold({ reason }: { reason: string | null }) {
+  if (!reason) return null;
+  return (
+    <p className="rounded-block bg-marigold-soft px-4 py-3 text-sm text-ink">
+      <span className="font-semibold">Automatic email is on hold.</span> {reason} New reminders wait in To send for you to send yourself.
+    </p>
+  );
+}
+
 export function Stat({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
   return (
     <div>

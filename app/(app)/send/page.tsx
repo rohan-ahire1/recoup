@@ -3,9 +3,10 @@ import { markAllSentAction } from '@/app/actions';
 import { Icon } from '@/app/components/icons';
 import { SendPanel } from '@/app/components/SendPanel';
 import { SubmitButton } from '@/app/components/SubmitButton';
-import { Avatar, Empty, ListToolbar, PageTitle, Panel } from '@/app/components/ui';
+import { Avatar, Empty, ListToolbar, PageTitle, Panel, SendingHold } from '@/app/components/ui';
 import { aiEnabled } from '@/lib/ai';
 import { requireBusiness } from '@/lib/auth';
+import { sendingBlocked } from '@/lib/email';
 import { formatDateTime, money, plural } from '@/lib/format';
 import { providerStatus } from '@/lib/providers';
 import { getCustomer, listMessagesByStatus } from '@/lib/repo';
@@ -25,13 +26,14 @@ function labelOf(m: Message) {
 }
 
 export default async function SendPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
-  enterBusiness(await requireBusiness());
+  const { business } = enterBusiness(await requireBusiness());
   const { tab = 'ready' } = await searchParams;
   const { timezone } = getSettings();
   const ready = listMessagesByStatus(['ready']).reverse();
   const history = tab === 'history' ? listMessagesByStatus(['sent', 'received', 'failed'], 200) : [];
   const providers = providerStatus();
   const ai = aiEnabled();
+  const hold = providers.email !== 'mock' ? sendingBlocked(business.id) : null;
 
   return (
     <>
@@ -70,6 +72,8 @@ export default async function SendPage({ searchParams }: { searchParams: Promise
         ))}
       </nav>
       </ListToolbar>
+
+      {tab === 'ready' && <SendingHold reason={hold} />}
 
       {tab === 'ready' ? (
         ready.length === 0 ? (
