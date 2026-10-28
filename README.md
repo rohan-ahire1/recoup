@@ -92,6 +92,7 @@ Everything is optional in development. Copy `.env.example` to `.env` and fill in
 | Error alerts (ntfy) | `NTFY_URL` |
 | Contact shown on Privacy and Terms | `SUPPORT_EMAIL` |
 | Where databases live | `DATA_DIR` (default `./data`) |
+| Most demo workspaces alive at once | `MAX_LIVE_DEMOS` (default 300) |
 
 Without email keys, sign-in links are printed to the server log.
 
