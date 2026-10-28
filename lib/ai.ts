@@ -11,7 +11,7 @@ export function aiEnabled(): boolean {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
-const MODEL = 'claude-opus-5';
+const MODEL = 'claude-sonnet-5-5';
 
 let client: Anthropic | null = null;
 function anthropic(): Anthropic {
