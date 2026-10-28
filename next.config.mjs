@@ -1,6 +1,10 @@
 /** @type {import('next').NextConfig} */
 const isProd = process.env.NODE_ENV === 'production';
 
+// The portfolio desktop at rohanahire.com opens Recoup in a window; nothing else may frame it.
+// FRAME_ANCESTORS adds space-separated origins, e.g. for testing the portfolio locally.
+const frameAncestors = ['https://rohanahire.com', ...(process.env.FRAME_ANCESTORS ?? '').split(/\s+/).filter(Boolean)];
+
 const securityHeaders = [
   { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -17,8 +21,7 @@ const securityHeaders = [
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
       "connect-src 'self'",
-      // The portfolio desktop at rohanahire.com opens Recoup in a window; nothing else may frame it.
-      "frame-ancestors https://rohanahire.com http://localhost:3104 http://127.0.0.1:3104",
+      `frame-ancestors ${frameAncestors.join(' ')}`,
       "base-uri 'self'",
       // Server actions post to this origin; the QuickBooks sign-in is a plain link.
       "form-action 'self'",
