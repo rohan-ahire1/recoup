@@ -29,7 +29,7 @@ There is never more than one message waiting per customer, and always at least t
 - **Customer payment page** in the business's name, showing how to pay (instructions or the business's own payment link) and letting the customer split the balance into 2 or 3 payments two weeks apart. Recoup never handles the money itself.
 - **QuickBooks Online sync** (read-only). Customers and invoices sync hourly; a payment recorded in QuickBooks stops reminders.
 - **Reports.** Today view, filters (status, type, payment pattern, amount, age, tag) with saved views, aging, recovered by month, recovery rate by tone, and CSV export.
-- **Optional AI features** using the Anthropic API: personalizing a message from the customer's history, writing a new tone from a description, and reading a pasted reply to classify it (paid, promise with date, dispute, and so on). Hidden until `ANTHROPIC_API_KEY` is set. With `TYPESAFE_API_KEY` set, TypeSafe's Jev picks the reply type and unclear replies go to you to check.
+- **Optional AI features** using the Anthropic API: personalizing a message from the customer's history, writing a new tone from a description, and reading a pasted reply to classify it (paid, promise with date, dispute, and so on). Hidden until `ANTHROPIC_API_KEY` is set. With `TYPESAFE_API_KEY` set, TypeSafe's Jev picks the reply type and unclear replies go to you to check. Each business gets 300 AI calls a month (`AI_MONTHLY_CAP`) and at most 30 in any 10 minutes; past that, replies are logged unread.
 
 ## Tech stack
 
@@ -88,7 +88,7 @@ Everything is optional in development. Copy `.env.example` to `.env` and fill in
 | Scheduler (`POST /api/cron/run` every 15 minutes) | `CRON_SECRET` |
 | Email via Resend | `RESEND_API_KEY`, `EMAIL_FROM`, `AUTH_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET`, `EMAIL_DAILY_CAP` |
 | QuickBooks Online | `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`, `QUICKBOOKS_ENVIRONMENT`, `TOKEN_ENCRYPTION_KEY` |
-| AI features | `ANTHROPIC_API_KEY`, `TYPESAFE_API_KEY` (optional, Jev sorts replies) |
+| AI features | `ANTHROPIC_API_KEY`, `TYPESAFE_API_KEY` (optional, Jev sorts replies), `AI_MONTHLY_CAP` (AI calls per business per month, default 300) |
 | Error alerts (ntfy) | `NTFY_URL` |
 | Contact shown on Privacy and Terms | `SUPPORT_EMAIL` |
 | Where databases live | `DATA_DIR` (default `./data`) |
