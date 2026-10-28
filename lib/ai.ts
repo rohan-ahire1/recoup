@@ -1,5 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { aiCallsThisMonth, takeAiCall } from './accounts';
+import { formatDateLong } from './format';
+import { allow } from './rate-limit';
 import type { TemplateKey } from './sequence';
+import { currentTenant } from './tenant';
 import type { MessageTemplate, TemplateSetContent } from './tones';
 import { asChoice, askJev, jevEnabled, type ChoiceAnswer } from './jev';
 import type { ReplyKind } from './types';
@@ -14,6 +18,38 @@ export function aiEnabled(): boolean {
 
 const MODEL = 'claude-sonnet-5-5';
 
+/** At most this many AI calls per business in any 10 minutes. */
+export const AI_BURST_LIMIT = 30;
+const AI_BURST_WINDOW_MS = 10 * 60_000;
+
+/** AI calls per business per calendar month (UTC). Demo businesses count too. */
+export const aiMonthlyCap = () => Number(process.env.AI_MONTHLY_CAP) || 300;
+
+/** 'YYYY-MM' in UTC. */
+export const aiMonth = (now: number) => new Date(now).toISOString().slice(0, 7);
+
+/** Thrown when a business has hit an AI limit. The message is fine to show the owner. */
+export class AiLimitError extends Error {}
+
+/**
+ * Every AI call goes through here first. Counts the call and returns null, or
+ * returns why it's refused (too many in a few minutes, or the month's allowance is used).
+ */
+export function reserveAiCall(businessId: string, now = Date.now()): string | null {
+  if (!allow(`ai:${businessId}`, AI_BURST_LIMIT, AI_BURST_WINDOW_MS, now)) return 'That’s a lot of AI requests in a few minutes. Please try again shortly.';
+  if (!takeAiCall(businessId, aiMonth(now), aiMonthlyCap())) {
+    const d = new Date(now);
+    const resets = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString().slice(0, 10);
+    return `You’ve used this month’s AI allowance. It resets on ${formatDateLong(resets)}.`;
+  }
+  return null;
+}
+
+/** For Settings: calls made this month and the cap. */
+export function aiUsage(businessId: string, now = Date.now()): { used: number; cap: number } {
+  return { used: aiCallsThisMonth(businessId, aiMonth(now)), cap: aiMonthlyCap() };
+}
+
 let client: Anthropic | null = null;
 function anthropic(): Anthropic {
   client ??= new Anthropic();
@@ -25,8 +61,13 @@ Be human, brief and respectful. Never threaten, shame, or mention collections ag
 Keep every placeholder in curly braces exactly as given (for example {pay_link}) so the app can fill them in.
 Text messages must stay under 300 characters and end with "Reply STOP to opt out."`;
 
-/** One JSON-schema call with the default refusal fallback; returns the parsed object. */
+/**
+ * One JSON-schema call with the default refusal fallback; returns the parsed object.
+ * The only place that calls the Anthropic API, so every call is counted against the current business.
+ */
 async function jsonCall<T>(system: string, prompt: string, schema: Record<string, unknown>, maxTokens: number): Promise<T> {
+  const refused = reserveAiCall(currentTenant().businessId);
+  if (refused) throw new AiLimitError(refused);
   const response = await anthropic().beta.messages.create({
     model: MODEL,
     max_tokens: maxTokens,

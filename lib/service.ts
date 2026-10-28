@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { registerPayToken } from './accounts';
-import { aiEnabled, classifyReply, generateTemplateSet, personalizeMessage } from './ai';
+import { AiLimitError, aiEnabled, classifyReply, generateTemplateSet, personalizeMessage } from './ai';
 import { parseInvoiceCsv, type ParsedRow } from './csv';
 import { all, get, run, tx } from './db';
 import { formatDateLong, money, plural } from './format';
@@ -597,13 +597,17 @@ export async function logReply(input: ReplyInput, now = getNow()) {
   let promiseDate = input.promiseDate ?? null;
   let summary: string | null = null;
   if (kind === 'auto') {
+    kind = 'other';
     if (aiEnabled()) {
-      const read = await classifyReply(input.body, today(now));
-      kind = read.kind;
-      promiseDate = read.promiseDate;
-      summary = read.summary;
-    } else {
-      kind = 'other';
+      try {
+        const read = await classifyReply(input.body, today(now));
+        kind = read.kind;
+        promiseDate = read.promiseDate;
+        summary = read.summary;
+      } catch (err) {
+        // Over the AI limit: log it unread, as when AI is off, so the reply is never lost.
+        if (!(err instanceof AiLimitError)) throw err;
+      }
     }
   }
   const c = getOpenCase(customer.id);
