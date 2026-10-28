@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { renameBusiness } from '@/lib/accounts';
+import { AiLimitError } from '@/lib/ai';
 import { requireBusiness } from '@/lib/auth';
 import { normalizeEmail, normalizePhone, parseAmount } from '@/lib/csv';
 import { addOwnDomain, checkOwnDomain, removeOwnDomain } from '@/lib/email';
@@ -93,10 +94,17 @@ export async function sendNowAction(form: FormData) {
   refresh();
 }
 
-export async function personalizeAction(form: FormData) {
+/** Returns a message to show instead of the rewrite when an AI limit is hit. */
+export async function personalizeAction(form: FormData): Promise<string | null> {
   enterBusiness(await requireBusiness());
-  await svc.personalizeDraft(num(form, 'id'));
+  try {
+    await svc.personalizeDraft(num(form, 'id'));
+  } catch (err) {
+    if (err instanceof AiLimitError) return err.message;
+    throw err;
+  }
   refresh();
+  return null;
 }
 
 // ---------------------------------------------------------------- customers
@@ -220,7 +228,13 @@ export async function duplicateTemplateAction(form: FormData) {
 
 export async function createTemplateWithAIAction(form: FormData) {
   enterBusiness(await requireBusiness());
-  const id = await svc.createTemplateSetWithAI(str(form, 'name'), str(form, 'description'));
+  let id: number;
+  try {
+    id = await svc.createTemplateSetWithAI(str(form, 'name'), str(form, 'description'));
+  } catch (err) {
+    if (err instanceof AiLimitError) redirect(`/templates?aiError=${encodeURIComponent(err.message)}`);
+    throw err;
+  }
   refresh();
   redirect(`/templates/${id}`);
 }

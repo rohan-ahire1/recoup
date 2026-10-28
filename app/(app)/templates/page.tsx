@@ -48,8 +48,9 @@ function SetCard({ set, isDefault, businessName, senderName }: { set: TemplateSe
   );
 }
 
-export default async function TemplatesPage() {
+export default async function TemplatesPage({ searchParams }: { searchParams: Promise<{ aiError?: string }> }) {
   enterBusiness(await requireBusiness());
+  const { aiError } = await searchParams;
   const sets = listTemplateSets();
   const { defaultTemplateSet, businessName, senderName } = getSettings();
   const builtin = sets.filter((s) => s.builtin);
@@ -103,6 +104,7 @@ export default async function TemplatesPage() {
                 <textarea name="description" required rows={3} placeholder="Short and warm, like a note from a neighbor. First names, no corporate phrases." className={`mt-1 py-2 ${FIELD}`} />
               </label>
               <SubmitButton variant="primary" icon="sparkle" pendingLabel="Writing every step…">Write it with AI</SubmitButton>
+              {aiError && <p role="status" className="text-rust">{aiError}</p>}
             </form>
           ) : (
             <PremiumTeaser title="Describe a style, get every step" detail="AI writes all four reminders and plan notes, by email and text." />

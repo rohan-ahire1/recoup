@@ -10,7 +10,7 @@ import {
 } from '@/app/actions';
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { buttonClass, Chip, FIELD, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
-import { aiEnabled } from '@/lib/ai';
+import { aiEnabled, aiUsage } from '@/lib/ai';
 import { getEmailDomain, getQuickBooks, getUser } from '@/lib/accounts';
 import { dailyCap, senderFor } from '@/lib/email';
 import { relativeTime } from '@/lib/format';
@@ -64,6 +64,13 @@ export default async function SettingsPage({
   const domain = getEmailDomain(business.id);
   const qbo = getQuickBooks(business.id);
   const qbNotice = qb ? QB_NOTICES[qb] : undefined;
+  const ai = aiEnabled() ? aiUsage(business.id) : null;
+  const aiDetail = (
+    <>
+      Personalizes messages, writes templates, and reads customer replies.
+      {ai && <span className="block">AI used this month: {ai.used} of {ai.cap}</span>}
+    </>
+  );
   const connectQb = (
     <a href="/api/quickbooks/connect" className={buttonClass('outline', 'sm')}>
       {qbo ? 'Connect again' : 'Connect'}
@@ -278,7 +285,7 @@ export default async function SettingsPage({
           <Connection id="quickbooks" name="QuickBooks Online" detail={qbDetail} status={qbStatus} />
           <Connection name="Gmail or Outlook mailbox" detail="Send from your own address and see replies here automatically." status={<Chip tone="outline">Coming soon</Chip>} />
           <Connection name="Email sending" detail="Send reminders directly, without opening your mail app." status={p.email !== 'mock' ? connected : <Chip tone="outline">{isDemoMode() ? 'Off in the demo' : 'Not set up yet'}</Chip>} />
-          <Connection name="AI assistant" detail="Personalizes messages, writes templates, and reads customer replies." status={aiEnabled() ? connected : <PremiumBadge />} />
+          <Connection name="AI assistant" detail={aiDetail} status={ai ? connected : <PremiumBadge />} />
         </ul>
       </Panel>
 

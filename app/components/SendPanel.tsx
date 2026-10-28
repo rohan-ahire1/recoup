@@ -34,6 +34,7 @@ export function SendPanel({
 }) {
   const [editing, setEditing] = useState(false);
   const [opened, setOpened] = useState(false);
+  const [aiNote, setAiNote] = useState<string | null>(null);
   const isEmail = draft.channel === 'email';
   const to = draft.toAddr ?? '';
   const d = { to, subject: draft.subject ?? '', body: draft.body };
@@ -100,11 +101,12 @@ export function SendPanel({
       )}
 
       {aiEnabled && (
-        <form action={personalizeAction}>
+        <form action={async (fd) => setAiNote(await personalizeAction(fd))} className="flex flex-col items-start gap-2">
           <input type="hidden" name="id" value={draft.id} />
           <SubmitButton variant="outline" size="sm" icon="sparkle" pendingLabel="Rewriting…">
             Personalize with AI
           </SubmitButton>
+          {aiNote && <p role="status" className="text-sm font-semibold text-rust">{aiNote}</p>}
         </form>
       )}
 
