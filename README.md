@@ -115,6 +115,8 @@ Without email keys, sign-in links are printed to the server log.
 
 `scripts/deploy.sh` pulls `main`, installs, builds, restarts, checks `/api/health`, and rolls back to the previous commit if the new one isn't healthy.
 
+Before it touches the code, `deploy.sh` backs up every database with `scripts/backup-db.mjs` into `~/backups/recoup/pre-deploy/<sha>-<timestamp>/` (`<sha>` is the commit that was running; `DATA_DIR` and `BACKUP_DIR` override the paths, as for the nightly backup). It keeps the last 10 pre-deploy backups. If the backup fails, the deploy stops and the running app is left alone. A rollback only goes back to the old code: migrations stay applied, so it prints the pre-deploy backup's path and leaves restoring it to you. To restore, stop `recoup`, copy `accounts.db` and `tenants/` from the dated folder inside that backup over `data/`, and start it again.
+
 ## Project layout
 
 ```
