@@ -21,12 +21,15 @@ import { currentTenant, runAsBusiness } from './tenant';
  * Once a business verifies its own domain, it goes out from their address.
  * One business's bad list mustn't hurt everyone else's delivery, so each has a
  * daily cap and loses automatic sending after too many bounces or complaints.
+ * New accounts on the shared address get a lower cap for their first days.
  */
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
 export const dailyCap = () => Number(process.env.EMAIL_DAILY_CAP) || 200;
+export const newAccountDays = () => Number(process.env.NEW_ACCOUNT_DAYS) || 14;
+export const newAccountDailyCap = () => Number(process.env.NEW_ACCOUNT_DAILY_CAP) || 20;
 
 /** Bounces or complaints above these, over the last week, pause automatic email. */
 const MIN_SAMPLE = 20;
@@ -45,12 +48,28 @@ export function senderFor(businessId: string, settings: Settings): { from: strin
   return { from: mailbox(`${name} via Recoup`, process.env.EMAIL_FROM ?? ''), replyTo: settings.replyToEmail || undefined };
 }
 
-/** Why automatic email can't go out for this business right now, or null if it can. */
+/**
+ * Automatic emails this business can send a day. A new account on the shared
+ * address gets the lower new-account cap until `risesAt`; verifying its own
+ * domain lifts that straight away, since its mail no longer uses ours.
+ */
+export function dailyLimit(businessId: string, now = Date.now()): { cap: number; risesAt?: number } {
+  const b = getBusiness(businessId);
+  const risesAt = b ? b.createdAt + newAccountDays() * DAY : 0;
+  if (risesAt > now && !verifiedDomain(businessId)) return { cap: Math.min(newAccountDailyCap(), dailyCap()), risesAt };
+  return { cap: dailyCap() };
+}
+
+/** Why automatic email can't go out for this business right now, or null if it can. One or more full sentences. */
 export function sendingBlocked(businessId: string, now = Date.now()): string | null {
   const b = getBusiness(businessId);
-  if (b?.emailPausedAt) return b.emailPausedReason ?? 'Automatic email is paused';
-  if (emailStats(businessId, now - DAY).sent >= dailyCap()) return `Daily limit of ${dailyCap()} emails reached`;
-  return null;
+  if (b?.emailPausedAt) return (b.emailPausedReason ?? 'Automatic email is paused').replace(/\.?$/, '.');
+  const { cap, risesAt } = dailyLimit(businessId, now);
+  if (emailStats(businessId, now - DAY).sent < cap) return null;
+  if (risesAt) {
+    return `Daily limit of ${cap} emails reached. New accounts can send ${cap} automatic emails a day for their first ${newAccountDays()} days. Verify your own sending domain in Settings to lift this.`;
+  }
+  return `Daily limit of ${cap} emails reached.`;
 }
 
 /** The plain footer on every automatic email: who it's from and where they are. */

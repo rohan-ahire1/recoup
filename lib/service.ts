@@ -388,7 +388,7 @@ async function prepare(customer: Customer, c: Case, action: Action, now: number)
   const via = action.channel === 'email' ? 'email' : 'text';
   const blocked = autoSends(action.channel, settings) ? sendingBlocked(currentTenant().businessId) : null;
   if (!autoSends(action.channel, settings) || blocked) {
-    logEvent(customer.id, c.id, 'prepared', `${label} ready to send by ${via}${blocked ? `. ${blocked}, so it waits for you.` : ''}`, now);
+    logEvent(customer.id, c.id, 'prepared', `${label} ready to send by ${via}${blocked ? `. ${blocked} It waits for you.` : ''}`, now);
     return 'prepared' as const;
   }
   const result = await deliver({ channel: action.channel, toAddr: to, subject, body }, settings);
