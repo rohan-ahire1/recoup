@@ -112,6 +112,11 @@ CREATE TABLE ai_usage (
   PRIMARY KEY (business_id, month)
 );
 `,
+  `
+-- When a session was last used, a few minutes at a time, so idle demos can make room.
+ALTER TABLE sessions ADD COLUMN last_seen_at INTEGER;
+CREATE INDEX sessions_business ON sessions(business_id);
+`,
 ];
 
 const MINUTE = 60_000;
@@ -256,19 +261,26 @@ export interface Session {
 export function createSession(opts: { userId?: string | null; businessId?: string | null }, now = Date.now()): string {
   const token = secret();
   adb()
-    .prepare('INSERT INTO sessions (token_hash, user_id, business_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
-    .run(hash(token), opts.userId ?? null, opts.businessId ?? null, now, now + SESSION_TTL);
+    .prepare('INSERT INTO sessions (token_hash, user_id, business_id, created_at, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)')
+    .run(hash(token), opts.userId ?? null, opts.businessId ?? null, now, now + SESSION_TTL, now);
   return token;
 }
 
+const SEEN_EVERY = 5 * MINUTE;
+
 export function getSession(token: string, now = Date.now()): Session | undefined {
   const d = adb();
-  const s = d
-    .prepare('SELECT user_id AS userId, business_id AS businessId, expires_at AS expiresAt FROM sessions WHERE token_hash = ? AND expires_at > ?')
-    .get(hash(token), now) as Session | undefined;
-  // Sliding expiry, written at most once a day.
-  if (s && s.expiresAt - now < SESSION_TTL - DAY) {
-    d.prepare('UPDATE sessions SET expires_at = ? WHERE token_hash = ?').run(now + SESSION_TTL, hash(token));
+  const r = d
+    .prepare(
+      'SELECT user_id AS userId, business_id AS businessId, expires_at AS expiresAt, last_seen_at AS lastSeenAt FROM sessions WHERE token_hash = ? AND expires_at > ?',
+    )
+    .get(hash(token), now) as (Session & { lastSeenAt: number | null }) | undefined;
+  if (!r) return undefined;
+  const { lastSeenAt, ...s } = r;
+  // Sliding expiry, written at most once a day; last use, at most every few minutes.
+  const slide = s.expiresAt - now < SESSION_TTL - DAY;
+  if (slide || lastSeenAt === null || now - lastSeenAt >= SEEN_EVERY) {
+    d.prepare('UPDATE sessions SET expires_at = ?, last_seen_at = ? WHERE token_hash = ?').run(slide ? now + SESSION_TTL : s.expiresAt, now, hash(token));
   }
   return s;
 }
