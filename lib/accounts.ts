@@ -451,13 +451,56 @@ export function removeQuickBooks(businessId: string) {
 
 // ---------------------------------------------------------------- housekeeping
 
+/** Delete demos past their expiry. Returns how many went. */
+export function removeExpiredDemos(now = Date.now()): number {
+  const demos = adb().prepare('SELECT id FROM businesses WHERE demo = 1 AND expires_at < ?').all(now) as { id: string }[];
+  for (const { id } of demos) deleteBusiness(id);
+  return demos.length;
+}
+
 /** Drop expired demos, sessions and sign-in links. Returns how many demos went. */
 export function cleanUp(now = Date.now()): number {
   const d = adb();
-  const demos = d.prepare('SELECT id FROM businesses WHERE demo = 1 AND expires_at < ?').all(now) as { id: string }[];
-  for (const { id } of demos) deleteBusiness(id);
+  const demos = removeExpiredDemos(now);
   d.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now);
   d.prepare('DELETE FROM login_tokens WHERE expires_at < ?').run(now - DAY);
   d.prepare('DELETE FROM sent_emails WHERE sent_at < ?').run(now - 30 * DAY);
-  return demos.length;
+  return demos;
+}
+
+// ---------------------------------------------------------------- demo cap
+
+/** Each demo is a whole database on disk, so only this many may exist at once. */
+export const maxLiveDemos = () => Math.floor(Number(process.env.MAX_LIVE_DEMOS)) || 300;
+const IDLE_AFTER = 60 * MINUTE;
+
+export function countLiveDemos(now = Date.now()): number {
+  return Number((adb().prepare('SELECT count(*) AS n FROM businesses WHERE demo = 1 AND expires_at > ?').get(now) as { n: number }).n);
+}
+
+/** Delete the oldest live demo nobody has used for an hour. Returns its id, if one went. */
+export function removeOldestIdleDemo(now = Date.now()): string | undefined {
+  const since = now - IDLE_AFTER;
+  const r = adb()
+    .prepare(
+      `SELECT b.id FROM businesses b
+       WHERE b.demo = 1 AND b.expires_at > ? AND b.created_at <= ?
+         AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.business_id = b.id AND COALESCE(s.last_seen_at, s.created_at) > ?)
+       ORDER BY b.created_at LIMIT 1`,
+    )
+    .get(now, since, since) as { id: string } | undefined;
+  if (r) deleteBusiness(r.id);
+  return r?.id;
+}
+
+/**
+ * Whether one more demo fits under the cap, deleting expired and then the
+ * oldest idle demo when it's full. `full` says the cap was reached at all.
+ */
+export function makeRoomForDemo(max = maxLiveDemos(), now = Date.now()): { ok: boolean; full: boolean } {
+  if (countLiveDemos(now) < max) return { ok: true, full: false };
+  removeExpiredDemos(now);
+  if (countLiveDemos(now) < max) return { ok: true, full: true };
+  removeOldestIdleDemo(now);
+  return { ok: countLiveDemos(now) < max, full: true };
 }
