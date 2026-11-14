@@ -10,7 +10,6 @@ import type { SendResult } from './providers';
 import { resendConfigured } from './providers/email';
 import {
   builtinSet,
-  findCustomer,
   getCase,
   getCustomer,
   getInvoice,
@@ -24,6 +23,7 @@ import {
   listInstallments,
   listOpenCases,
   logEvent,
+  matchCustomer,
   openInvoices,
   readyMessageForCase,
   sentKeys,
@@ -74,11 +74,21 @@ export function previewImport(text: string, now = getNow()) {
   const { timezone } = getSettings();
   const { rows, missingColumns, hasHistory } = parseInvoiceCsv(text, { now, timeZone: timezone });
   const existing = new Set(all<{ n: string }>('SELECT lower(number) AS n FROM invoices').map((r) => r.n));
-  const preview: PreviewRow[] = rows.map((r) => ({
-    ...r,
-    duplicate: Boolean(r.invoice && existing.has(r.invoice.invoiceNumber.toLowerCase())),
-    existingCustomer: Boolean(r.invoice && findCustomer({ name: r.invoice.customerName, email: r.invoice.email, phone: r.invoice.phone })),
-  }));
+  const preview: PreviewRow[] = rows.map((r) => {
+    const warnings = [...r.warnings];
+    let existingCustomer = false;
+    if (r.invoice) {
+      const match = matchCustomer({ name: r.invoice.customerName, email: r.invoice.email, phone: r.invoice.phone });
+      existingCustomer = Boolean(match.customer);
+      if (match.nameConflict) warnings.push('Same name as an existing customer but different contact details; added as a new customer');
+    }
+    return {
+      ...r,
+      warnings,
+      duplicate: Boolean(r.invoice && existing.has(r.invoice.invoiceNumber.toLowerCase())),
+      existingCustomer,
+    };
+  });
   const ready = preview.filter((r) => r.invoice && !r.duplicate);
   const t = today(now);
   const openReady = ready.filter((r) => !r.invoice!.paid);
@@ -112,7 +122,7 @@ interface IncomingCustomer {
 /** Find the customer an import or sync means, or add them. Fills gaps but never overwrites what the owner set. */
 function ensureCustomer(c: IncomingCustomer, addedNote: string, now: number): Customer {
   let customer =
-    (c.qbId ? findCustomerByQbId(c.qbId) : undefined) ?? findCustomer({ name: c.name, email: c.email, phone: c.phone });
+    (c.qbId ? findCustomerByQbId(c.qbId) : undefined) ?? matchCustomer({ name: c.name, email: c.email, phone: c.phone }).customer;
   if (!customer) {
     const payToken = token();
     const id = run(

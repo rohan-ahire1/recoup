@@ -59,6 +59,38 @@ export function findCustomer(by: { name?: string; email?: string | null; phone?:
   return undefined;
 }
 
+export interface CustomerMatch {
+  customer?: Customer;
+  /** A customer with the same name exists but their contact details differ, so this is a different person. */
+  nameConflict?: Customer;
+}
+
+/**
+ * Match an imported customer by email first, then phone. A name only identifies
+ * a customer when the row has no contact details, or when the same-name
+ * customer has no conflicting email/phone.
+ */
+export function matchCustomer(by: { name?: string | null; email?: string | null; phone?: string | null }): CustomerMatch {
+  const email = by.email || null;
+  const phone = by.phone || null;
+  const byContact: [string, string | null][] = [
+    ['email = ?', email],
+    ['phone = ?', phone],
+  ];
+  for (const [where, value] of byContact) {
+    if (!value) continue;
+    const r = get<Row>(`SELECT ${CUSTOMER_COLS} FROM customers WHERE ${where} ORDER BY id LIMIT 1`, value);
+    if (r) return { customer: toCustomer(r) };
+  }
+  if (!by.name) return {};
+  const sameName = all<Row>(`SELECT ${CUSTOMER_COLS} FROM customers WHERE name = ? COLLATE NOCASE ORDER BY id`, by.name).map(toCustomer);
+  if (!sameName.length) return {};
+  if (!email && !phone) return { customer: sameName[0] };
+  const compatible = (existing: string | null, incoming: string | null) => !existing || (incoming !== null && existing === incoming);
+  const customer = sameName.find((c) => compatible(c.email, email) && compatible(c.phone, phone));
+  return customer ? { customer } : { nameConflict: sameName[0] };
+}
+
 export function updateCustomer(id: number, fields: Record<string, string | number | null>) {
   const cols = Object.keys(fields);
   if (!cols.length) return;
