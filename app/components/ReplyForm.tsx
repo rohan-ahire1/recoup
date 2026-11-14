@@ -14,7 +14,7 @@ const OUTCOMES = [
 ] as const;
 
 /** Log what a customer said (from your inbox, a call, or a text) and what it means. */
-export function ReplyForm({ customerId, firstName, aiEnabled, defaultChannel }: { customerId: number; firstName: string; aiEnabled: boolean; defaultChannel: 'email' | 'sms' }) {
+export function ReplyForm({ customerId, firstName, aiEnabled, defaultChannel, today }: { customerId: number; firstName: string; aiEnabled: boolean; defaultChannel: 'email' | 'sms'; today: string }) {
   const [kind, setKind] = useState<string>(aiEnabled ? 'auto' : 'promise');
   const defaultDate = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
   return (
@@ -66,7 +66,7 @@ export function ReplyForm({ customerId, firstName, aiEnabled, defaultChannel }: 
       {kind === 'promise' && (
         <label className="text-sm font-semibold">
           Pay by
-          <input type="date" name="promiseDate" defaultValue={defaultDate} required className="num mt-1.5 block h-11 rounded-control bg-paper px-3 font-normal ring-1 ring-field ring-inset focus:ring-teal" />
+          <input type="date" name="promiseDate" defaultValue={defaultDate} min={today} required className="num mt-1.5 block h-11 rounded-control bg-paper px-3 font-normal ring-1 ring-field ring-inset focus:ring-teal" />
         </label>
       )}
       <SubmitButton variant="primary" pendingLabel="Saving…">

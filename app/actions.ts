@@ -140,10 +140,12 @@ export async function handledAction(form: FormData) {
   refresh();
 }
 
-export async function promiseAction(form: FormData) {
+export async function promiseAction(form: FormData): Promise<string | null> {
   enterBusiness(await requireBusiness());
-  svc.setPromise(num(form, 'customerId'), str(form, 'date'));
+  const error = svc.setPromise(num(form, 'customerId'), str(form, 'date'));
+  if (error) return error;
   refresh();
+  return null;
 }
 
 export async function setToneAction(form: FormData) {
