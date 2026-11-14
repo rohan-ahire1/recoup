@@ -677,6 +677,36 @@ async function applyReply(customer: Customer, c: Case | undefined, kind: ReplyKi
 
 // =================================================================== payments & plans
 
+/**
+ * Apply a plan payment that didn't name an installment to the case's unpaid
+ * installments in order. The running total starts when the plan was chosen
+ * (the first installment's due date), so payments from before the plan don't count.
+ */
+function applyPlanPayment(caseId: number, paymentId: number, now: number) {
+  const installments = listInstallments(caseId);
+  if (!installments.length) return;
+  const total = get<{ total: number }>(
+    `SELECT COALESCE(SUM(amount_cents), 0) AS total FROM payments
+     WHERE case_id = ? AND (paid_at >= ? OR id = ?)`,
+    caseId,
+    installments[0].dueAt,
+    paymentId,
+  )!.total;
+
+  let cumulative = 0;
+  const covered = new Set<number>();
+  for (const inst of installments) {
+    cumulative += inst.amountCents;
+    if (total < cumulative) continue;
+    covered.add(inst.id);
+    if (!inst.paidAt) run('UPDATE installments SET paid_at = ? WHERE id = ?', now, inst.id);
+  }
+
+  const draft = readyMessageForCase(caseId);
+  const installmentId = draft?.actionKey?.startsWith('installment:') ? Number(draft.actionKey.split(':')[1]) : null;
+  if (draft && installmentId !== null && covered.has(installmentId)) updateMessage(draft.id, { status: 'skipped' });
+}
+
 export function recordPayment(opts: {
   customerId: number;
   amountCents: number;
@@ -714,6 +744,7 @@ export function recordPayment(opts: {
       updateInvoice(inv.id, { amount_paid_cents: paid, ...(paid >= inv.amountCents ? { status: 'paid', paid_date: t } : {}) }, now);
     }
     if (opts.installmentId) run('UPDATE installments SET paid_at = ? WHERE id = ?', now, opts.installmentId);
+    else if (c?.status === 'plan') applyPlanPayment(c.id, inserted.id, now);
 
     const via: Record<string, string> = { manual: 'recorded by you', demo: 'simulated', quickbooks: 'in QuickBooks' };
     const stillOverdue = c ? caseInvoices(customer.id, c.id).reduce((s, i) => s + owed(i), 0) : 0;
