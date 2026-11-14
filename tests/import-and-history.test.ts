@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { gmailLink, mailtoLink, outlookLink, smsLink } from '../lib/compose';
-import { normalizePhone, parseAmount, parseDue, parseInvoiceCsv } from '../lib/csv';
+import { normalizePhone, parseAmount, parseDate, parseDue, parseInvoiceCsv } from '../lib/csv';
 import { summarize, trackRecord } from '../lib/history';
 import { renderTemplate, templateVars } from '../lib/templates';
 import { BUILTIN_TONES } from '../lib/tones';
@@ -44,6 +44,43 @@ describe('CSV import', () => {
     expect(parseAmount('0')).toBeNull();
     expect(parseDue('8/1/26', '2026-09-26')).toBe('2026-08-01');
     expect(parseDue('2/30/2026', '2026-09-26')).toBeNull();
+  });
+
+  it('reads Excel and accounting date formats', () => {
+    const expected = '2026-08-25';
+    for (const value of [
+      '2026-08-25',
+      '2026-08-25 00:00:00',
+      '2026-08-25T00:00:00Z',
+      '8/25/2026',
+      '8/25/2026 0:00',
+      '8/25/2026 12:00 AM',
+      'Aug 25, 2026',
+      'August 25 2026',
+      '25 Aug 2026',
+      '25-Aug-2026',
+      '25-Aug-26',
+    ]) {
+      expect(parseDate(value), value).toBe(expected);
+    }
+    expect(parseDate('2026-02-30 00:00')).toBeNull();
+    expect(parseDate('25/08/2026')).toBeNull();
+  });
+
+  it('reads amounts with a leading or trailing USD', () => {
+    expect(parseAmount('$1,200.00 USD')).toBe(120000);
+    expect(parseAmount('1200 USD')).toBe(120000);
+    expect(parseAmount('  USD 1,200.00  ')).toBe(120000);
+    expect(parseAmount('€50')).toBeNull();
+    expect(parseAmount('-20')).toBeNull();
+  });
+
+  it('imports a CSV that uses month-name dates and USD amounts', () => {
+    const text = ['Customer,Email,Invoice,Amount,Due', 'Acme,acme@x.co,#1,"$1,200.00 USD","Aug 25, 2026"'].join('\n');
+    const { rows, missingColumns } = parseInvoiceCsv(text, opts);
+    expect(missingColumns).toEqual([]);
+    expect(rows[0].errors).toEqual([]);
+    expect(rows[0].invoice).toMatchObject({ amountCents: 120000, dueDate: '2026-08-25' });
   });
 });
 
