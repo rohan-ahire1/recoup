@@ -98,6 +98,48 @@ describe('prepared-mode sequence', () => {
   });
 });
 
+describe('customer matching on import', () => {
+  it('keeps different people with the same name apart, and merges real matches', async () => {
+    const text = [
+      'Customer,Email,Invoice,Description,Amount,Due,Paid',
+      `John Smith,john.one@x.co,#JS1,Service,100,${date(-3)},`,
+      `John Smith,john.two@x.co,#JS2,Service,100,${date(-3)},`,
+      `John Smith,john.one@x.co,#JS3,Service,100,${date(-3)},`,
+      `Jane Doe,jane@x.co,#JD1,Service,100,${date(-3)},`,
+      `John Smith,,#JS4,Service,100,${date(-300)},${date(-295)}`,
+      `Robert Jones,jane@x.co,#RJ1,Service,100,${date(-3)},`,
+    ].join('\n');
+    const result = await svc.importCsv(text, day(0));
+    expect(result.imported).toBe(6);
+    expect(result.customers).toBe(3);
+
+    const johns = repo.listCustomers().filter((c) => c.name === 'John Smith');
+    expect(johns.map((c) => c.email).sort()).toEqual(['john.one@x.co', 'john.two@x.co']);
+    const johnOne = johns.find((c) => c.email === 'john.one@x.co')!;
+    const invoiceCustomer = (number: string) => repo.listAllInvoices().find((i) => i.number === number)!.customerId;
+    expect(invoiceCustomer('JS3')).toBe(johnOne.id);
+    // A paid history row with no contact details joins the first customer with that name.
+    expect(invoiceCustomer('JS4')).toBe(johnOne.id);
+
+    const jane = repo.listCustomers().find((c) => c.email === 'jane@x.co')!;
+    expect(jane.name).toBe('Jane Doe');
+    expect(repo.listCustomers().filter((c) => c.email === 'jane@x.co')).toHaveLength(1);
+    // An email match wins even when the name is different.
+    expect(invoiceCustomer('RJ1')).toBe(jane.id);
+    expect(repo.listCustomers().some((c) => c.name === 'Robert Jones')).toBe(false);
+  });
+
+  it('warns in the preview when a same-name row is a different person', () => {
+    const text = [
+      'Customer,Email,Invoice,Description,Amount,Due,Paid',
+      `John Smith,john.three@x.co,#JS5,Service,100,${date(-3)},`,
+    ].join('\n');
+    const preview = svc.previewImport(text, day(0));
+    expect(preview.rows[0].existingCustomer).toBe(false);
+    expect(preview.rows[0].warnings).toContain('Same name as an existing customer but different contact details; added as a new customer');
+  });
+});
+
 describe('payment page', () => {
   it('flags "I’ve sent payment" for the business to check, once', () => {
     svc.reportPaymentSent(mika, day(10));
