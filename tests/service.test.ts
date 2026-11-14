@@ -114,3 +114,50 @@ describe('payment page', () => {
     expect(svc.summarizeCustomer(repo.getCustomer(mika)!, day(11)).openCase).toBeUndefined();
   });
 });
+
+describe('recorded payments count only what was applied', () => {
+  let overpaid: number;
+  let partial: number;
+
+  beforeAll(async () => {
+    const text = [
+      'Customer,Contact,Email,Phone,Invoice,Description,Amount,Due,Paid',
+      `Overpaid Co,Pat Quinn,pat@overpaid.co,,#10,Repair,780,${date(-1)},`,
+      `Partial Co,Sam Ortiz,sam@partial.co,,#20,Service,500,${date(-1)},`,
+    ].join('\n');
+    expect((await svc.importCsv(text, day(12))).imported).toBe(2);
+    overpaid = repo.findCustomer({ name: 'Overpaid Co' })!.id;
+    partial = repo.findCustomer({ name: 'Partial Co' })!.id;
+  });
+
+  it('stores only the applied amount when a payment is more than is owed', () => {
+    const before = svc.overview(day(13)).recoveredAll;
+    const r = svc.recordPayment({ customerId: overpaid, amountCents: 100000, source: 'manual', now: day(13) });
+    const payments = repo.listPayments(overpaid);
+    expect(payments).toHaveLength(1);
+    expect(payments[0].amountCents).toBe(78000);
+    expect(svc.overview(day(13)).recoveredAll).toBe(before + 78000);
+    const detail = repo.listEvents(overpaid).filter((e) => e.type === 'payment').at(-1)!.detail;
+    expect(detail).toBe("Paid $1,000.00 recorded by you. $220.00 is more than was owed and isn't counted. All caught up.");
+    expect(r).toEqual({ duplicate: false, applied: 78000 });
+  });
+
+  it('adds no payment row when nothing is owed', () => {
+    const before = svc.overview(day(14)).recoveredAll;
+    const r = svc.recordPayment({ customerId: overpaid, amountCents: 5000, source: 'manual', now: day(14) });
+    expect(repo.listPayments(overpaid)).toHaveLength(1); // only the first payment
+    expect(svc.overview(day(14)).recoveredAll).toBe(before);
+    const detail = repo.listEvents(overpaid).filter((e) => e.type === 'payment').at(-1)!.detail;
+    expect(detail).toBe('Payment of $50.00 recorded, but nothing was owed.');
+    expect(r).toEqual({ duplicate: false, applied: 0 });
+  });
+
+  it('leaves a normal partial payment unchanged', () => {
+    const r = svc.recordPayment({ customerId: partial, amountCents: 20000, source: 'manual', now: day(13) });
+    expect(r).toEqual({ duplicate: false, applied: 20000 });
+    expect(repo.listPayments(partial)).toHaveLength(1);
+    expect(repo.listPayments(partial)[0].amountCents).toBe(20000);
+    const detail = repo.listEvents(partial).filter((e) => e.type === 'payment').at(-1)!.detail;
+    expect(detail).toBe('Paid $200.00 recorded by you. $300.00 still overdue.');
+  });
+});
