@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { gmailLink, mailtoLink, outlookLink, smsLink } from '../lib/compose';
 import { normalizePhone, parseAmount, parseDue, parseInvoiceCsv } from '../lib/csv';
 import { summarize, trackRecord } from '../lib/history';
-import { renderTemplate, templateVars } from '../lib/templates';
+import { firstName, personName, renderTemplate, templateVars } from '../lib/templates';
 import { BUILTIN_TONES } from '../lib/tones';
 
 const NOW = Date.parse('2026-09-26T15:00:00Z');
@@ -111,5 +111,52 @@ describe('templates and send links', () => {
     expect(outlookLink(d)).toContain('outlook.office.com/mail/deeplink/compose?to=dana%40x.co&subject=');
     expect(mailtoLink(d)).toMatch(/^mailto:dana@x\.co\?subject=Invoice%20%232231&body=/);
     expect(smsLink('+13125550142', 'Hi & bye')).toBe('sms:+13125550142?&body=Hi%20%26%20bye');
+  });
+});
+
+describe('person names', () => {
+  const businessVars = {
+    invoices: [],
+    businessName: 'Ferro Service Co.',
+    senderName: 'Marco',
+    timeZone: 'America/Chicago',
+    now: NOW,
+  };
+
+  it('skips a leading honorific and uses the next word', () => {
+    const customer = { name: 'Shah Family', contactName: 'Dr. Priya Shah', type: 'individual' as const };
+    expect(personName(customer)).toBe('Priya');
+    expect(firstName(customer)).toBe('Priya');
+
+    expect(personName({ name: 'Dr. Priya Shah', contactName: null, type: 'individual' })).toBe('Priya');
+    expect(personName({ name: 'Priya', contactName: 'Dr.', type: 'business' })).toBeNull();
+    expect(personName({ name: 'Priya', contactName: 'MR. RUIZ', type: 'business' })).toBe('RUIZ');
+  });
+
+  it('greets a business with no contact as "there", not "Hi The,"', () => {
+    const customer = { name: 'The Oak Room', contactName: null, type: 'business' as const };
+    expect(personName(customer)).toBeNull();
+    expect(firstName(customer)).toBe('there');
+
+    const vars = templateVars({ ...businessVars, customer: { ...customer, payToken: 'tok' } });
+    expect(vars.first_name).toBe('there');
+    for (const tone of BUILTIN_TONES) {
+      for (const t of Object.values(tone.templates)) {
+        expect(renderTemplate(t.email, vars)).not.toContain('Hi The,');
+        expect(renderTemplate(t.sms, vars)).not.toContain('Hi The,');
+      }
+    }
+  });
+
+  it('uses the contact for a business when there is one', () => {
+    const customer = { name: 'Harbor Street Bakery', contactName: 'Dana Ruiz', type: 'business' as const };
+    expect(personName(customer)).toBe('Dana');
+    expect(firstName(customer)).toBe('Dana');
+  });
+
+  it('uses the name for an individual with no contact', () => {
+    const customer = { name: 'Mika Tanaka', contactName: null, type: 'individual' as const };
+    expect(personName(customer)).toBe('Mika');
+    expect(firstName(customer)).toBe('Mika');
   });
 });
