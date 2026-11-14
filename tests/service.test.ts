@@ -114,3 +114,24 @@ describe('payment page', () => {
     expect(svc.summarizeCustomer(repo.getCustomer(mika)!, day(11)).openCase).toBeUndefined();
   });
 });
+
+describe('payment plan balance', () => {
+  it('splits only the overdue invoices in the open case, not not-yet-due or disputed ones', async () => {
+    const planCsv = [
+      'Customer,Contact,Email,Phone,Invoice,Description,Amount,Due,Paid',
+      `Plan Customer,,plan@x.co,,#P1,Overdue,900,${date(-3)},`,
+      `Plan Customer,,plan@x.co,,#P2,Not due,500,${date(12)},`,
+      `Plan Customer,,plan@x.co,,#P3,Disputed,700,${date(-4)},`,
+    ].join('\n');
+    expect((await svc.importCsv(planCsv, day(12))).imported).toBe(3);
+    const customer = repo.findCustomer({ name: 'Plan Customer' })!;
+    const disputed = repo.listCustomerInvoices(customer.id).find((i) => i.number === 'P3')!;
+    repo.updateInvoice(disputed.id, { status: 'disputed' }, day(12));
+
+    expect(svc.planBalanceCents(customer)).toBe(90000);
+    const installments = svc.choosePlan(customer.id, 2, day(12));
+    expect(installments).toHaveLength(2);
+    expect(installments.reduce((s, i) => s + i.amountCents, 0)).toBe(90000);
+    expect(svc.planBalanceCents(repo.getCustomer(customer.id)!)).toBe(90000);
+  });
+});

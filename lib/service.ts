@@ -737,6 +737,13 @@ export function payableCents(customer: Customer): number {
   return payableInvoices(customer).reduce((s, i) => s + owed(i), 0);
 }
 
+/** The balance a payment plan splits: what the pay page collects, minus anything the customer disputes. */
+export function planBalanceCents(customer: Customer): number {
+  const c = getOpenCase(customer.id);
+  const invoices = c ? caseInvoices(customer.id, c.id) : openInvoices(customer.id);
+  return invoices.filter((i) => i.status !== 'disputed').reduce((s, i) => s + owed(i), 0);
+}
+
 /** The customer pressed "I've sent payment" on their payment page. Flags it for the business to check. */
 export function reportPaymentSent(customerId: number, now = getNow()) {
   const c = getOpenCase(customerId);
@@ -757,7 +764,9 @@ export function choosePlan(customerId: number, count: number, now = getNow()) {
     const c = getOpenCase(customerId);
     if (!c) throw new Error('Nothing is owed');
     if (c.status === 'plan') return listInstallments(c.id);
-    const balance = openInvoices(customerId).reduce((s, i) => s + owed(i), 0);
+    const customer = getCustomer(customerId);
+    if (!customer) throw new Error('Nothing is owed');
+    const balance = planBalanceCents(customer);
     splitInstallments(balance, count).forEach((amount, i) =>
       run('INSERT INTO installments (case_id, seq, amount_cents, due_at) VALUES (?, ?, ?, ?)', c.id, i + 1, amount, now + i * INSTALLMENT_INTERVAL_DAYS * DAY),
     );
