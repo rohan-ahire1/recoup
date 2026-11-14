@@ -469,6 +469,7 @@ export async function runDueActions(now = getNow()): Promise<RunResult> {
       now,
       timeZone: settings.timezone,
       autoSms: autoSends('sms', settings),
+      autoEmail: autoSends('email', settings),
     });
     for (const action of plan.actions) {
       const r = await prepare(customer, c, action, now);
@@ -494,6 +495,7 @@ export function nextFor(customer: Customer, c: Case | undefined, now = getNow())
     now,
     timeZone: getSettings().timezone,
     autoSms: autoSends('sms', getSettings()),
+    autoEmail: autoSends('email', getSettings()),
   }).next;
 }
 
