@@ -114,3 +114,46 @@ describe('payment page', () => {
     expect(svc.summarizeCustomer(repo.getCustomer(mika)!, day(11)).openCase).toBeUndefined();
   });
 });
+
+describe('promise dates', () => {
+  let id: number;
+
+  beforeAll(async () => {
+    const rows = ['Customer,Email,Invoice,Amount,Due', `Promise Tester,tester@x.co,#9,500,${date(-3)}`].join('\n');
+    await svc.importCsv(rows, day(0));
+    id = repo.findCustomer({ name: 'Promise Tester' })!.id;
+  });
+
+  it('rejects a past date and leaves the case alone', () => {
+    const before = repo.getOpenCase(id)!;
+    const err = svc.setPromise(id, date(-1), day(0));
+    expect(err).toMatch(/passed/i);
+    const after = repo.getOpenCase(id)!;
+    expect(after.status).toBe(before.status);
+    expect(after.promiseDate).toBeNull();
+  });
+
+  it('rejects an impossible calendar date', () => {
+    expect(svc.setPromise(id, '2026-02-31', day(0))).toMatch(/real date/i);
+    expect(repo.getOpenCase(id)!.promiseDate).toBeNull();
+  });
+
+  it('accepts today in the business timezone', () => {
+    expect(svc.setPromise(id, date(0), day(0))).toBeNull();
+    const c = repo.getOpenCase(id)!;
+    expect(c.status).toBe('promised');
+    expect(c.promiseDate).toBe(date(0));
+  });
+
+  it('holds a promise reply with a past date for a week instead of missing it', async () => {
+    await svc.logReply({ customerId: id, channel: 'email', body: 'I paid on the 3rd', kind: 'promise', promiseDate: date(-5) }, day(0));
+    const c = repo.getOpenCase(id)!;
+    expect(c.status).toBe('promised');
+    expect(c.promiseDate).toBe(date(7));
+    expect(repo.listEvents(id).some((e) => e.type === 'promised' && e.detail?.includes('No usable date given; holding reminders for a week.'))).toBe(true);
+
+    await svc.runDueActions(day(1));
+    expect(repo.getOpenCase(id)!.status).toBe('promised');
+    expect(repo.listEvents(id).some((e) => e.type === 'promise_missed')).toBe(false);
+  });
+});

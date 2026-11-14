@@ -411,7 +411,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
                   <Icon name="chevronDown" size={16} className="ease text-faint group-open:rotate-180" />
                 </summary>
                 <div className="pt-4">
-                  <ReplyForm customerId={customer.id} firstName={first} aiEnabled={ai} defaultChannel={customer.preferredChannel} />
+                  <ReplyForm customerId={customer.id} firstName={first} aiEnabled={ai} defaultChannel={customer.preferredChannel} today={t} />
                 </div>
               </details>
               <details className="group py-3">
