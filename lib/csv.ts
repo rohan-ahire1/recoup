@@ -71,7 +71,11 @@ export function normalizeEmail(input: string): string | null {
 }
 
 export function parseAmount(input: string): number | null {
-  const s = input.replace(/[$,\s]/g, '');
+  const s = input
+    .trim()
+    .replace(/^usd\s*/i, '')
+    .replace(/\s*usd$/i, '')
+    .replace(/[$,\s]/g, '');
   if (!/^\d+(\.\d{1,2})?$/.test(s)) return null;
   const cents = Math.round(parseFloat(s) * 100);
   return cents > 0 ? cents : null;
@@ -83,13 +87,60 @@ function validDate(y: number, m: number, d: number): string | null {
   return dt.toISOString().slice(0, 10);
 }
 
-/** "2026-08-25" or "8/25/2026". */
+const MONTHS: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12,
+};
+
+const toYear = (year: string) => (year.length === 2 ? 2000 + Number(year) : Number(year));
+
+/**
+ * "2026-08-25", "8/25/2026" or an English month name ("Aug 25, 2026", "25-Aug-26"),
+ * each optionally followed by a time of day. Day-first numeric dates stay invalid
+ * because they are ambiguous with US month-first dates.
+ */
 export function parseDate(input: string): string | null {
-  const s = input.trim();
+  // Drop a trailing time, e.g. " 00:00:00", "T00:00:00Z" or " 12:00 AM".
+  const s = input
+    .trim()
+    .replace(/[T\s]+\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:[AaPp]\.?[Mm]\.?)?(?:\s*(?:Z|[+-]\d{1,2}:?\d{2}))?$/, '')
+    .trim();
   let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (m) return validDate(Number(m[1]), Number(m[2]), Number(m[3]));
   m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
-  if (m) return validDate(m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]), Number(m[1]), Number(m[2]));
+  if (m) return validDate(toYear(m[3]), Number(m[1]), Number(m[2]));
+  m = s.match(/^([A-Za-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{2}|\d{4})$/);
+  if (m) {
+    const month = MONTHS[m[1].toLowerCase()];
+    if (month) return validDate(toYear(m[3]), month, Number(m[2]));
+  }
+  m = s.match(/^(\d{1,2})(?:st|nd|rd|th)?[\s-]+([A-Za-z]+)\.?[\s,-]+(\d{2}|\d{4})$/);
+  if (m) {
+    const month = MONTHS[m[2].toLowerCase()];
+    if (month) return validDate(toYear(m[3]), month, Number(m[1]));
+  }
   return null;
 }
 
