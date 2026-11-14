@@ -1,4 +1,4 @@
-import { DAY, isSmsAllowed, nextSmsWindow } from './time';
+import { DAY, isEmailAllowed, isSmsAllowed, nextEmailWindow, nextSmsWindow } from './time';
 import type { CaseStatus, Channel, Customer, Installment } from './types';
 
 export interface SequenceStep {
@@ -52,6 +52,8 @@ export interface EngineInput {
   timeZone: string;
   /** True when texts go out automatically, so quiet hours apply. */
   autoSms: boolean;
+  /** True when emails go out automatically, so the weekday sending window applies. */
+  autoEmail: boolean;
 }
 
 export interface EnginePlan {
@@ -102,8 +104,15 @@ export function planActions(input: EngineInput): EnginePlan {
 
   // Respect a minimum gap after the last message, however late the owner sent it.
   const gapUntil = lastSentAt ? lastSentAt + MIN_GAP_DAYS * DAY : 0;
-  const quiet = (at: number) => (channel === 'sms' && input.autoSms ? nextSmsWindow(at, timeZone) : at);
-  const canSendNow = now >= gapUntil && !(channel === 'sms' && input.autoSms && !isSmsAllowed(now, timeZone));
+  const quiet = (at: number) => {
+    if (channel === 'sms' && input.autoSms) return nextSmsWindow(at, timeZone);
+    if (channel === 'email' && input.autoEmail) return nextEmailWindow(at, timeZone);
+    return at;
+  };
+  const canSendNow =
+    now >= gapUntil &&
+    !(channel === 'sms' && input.autoSms && !isSmsAllowed(now, timeZone)) &&
+    !(channel === 'email' && input.autoEmail && !isEmailAllowed(now, timeZone));
 
   if (status === 'active') {
     // Only the latest due step is prepared; skipped steps are superseded, never sent in a burst.

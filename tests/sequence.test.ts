@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { allocatePayment, carrierKeyword, pickChannel, planActions, splitInstallments, type EngineInput } from '../lib/sequence';
-import { DAY, HOUR, localParts } from '../lib/time';
+import { DAY, HOUR, isEmailAllowed, localParts, nextEmailWindow } from '../lib/time';
 
 const TZ = 'America/Chicago';
 const START = Date.parse('2026-09-01T15:00:00Z'); // 10:00 in Chicago
@@ -19,6 +19,7 @@ function input(o: Partial<EngineInput> & { now: number }): EngineInput {
     installments: [],
     timeZone: TZ,
     autoSms: false,
+    autoEmail: false,
     ...o,
   };
 }
@@ -97,6 +98,36 @@ describe('sequence', () => {
     expect(pickChannel({ ...customer, email: null, optedOutSms: true })).toBeNull();
   });
 
+  it('holds an automatic email due on Saturday until Monday 08:00', () => {
+    // 2026-09-05 is a Saturday; 10:00 Chicago is 15:00Z.
+    const saturday = Date.parse('2026-09-05T15:00:00Z');
+    const quiet = planActions(input({ now: saturday, startedAt: saturday, autoEmail: true }));
+    expect(quiet.actions).toEqual([]);
+    expect(quiet.next).not.toBeNull();
+    const p = localParts(quiet.next!.at, TZ);
+    expect([p.year, p.month, p.day, p.hour, p.minute]).toEqual([2026, 9, 7, 8, 0]);
+
+    const monday = planActions(input({ now: quiet.next!.at, startedAt: saturday, autoEmail: true }));
+    expect(monday.actions.map((a) => a.key)).toEqual(['step:1']);
+  });
+
+  it('holds an automatic email due at 03:00 until 08:00 the same weekday', () => {
+    // 2026-09-08 is a Tuesday; 03:00 Chicago is 08:00Z.
+    const tuesdayEarly = Date.parse('2026-09-08T08:00:00Z');
+    const quiet = planActions(input({ now: tuesdayEarly, startedAt: tuesdayEarly, autoEmail: true }));
+    expect(quiet.actions).toEqual([]);
+    const p = localParts(quiet.next!.at, TZ);
+    expect([p.year, p.month, p.day, p.hour, p.minute]).toEqual([2026, 9, 8, 8, 0]);
+
+    const tuesdayMorning = planActions(input({ now: quiet.next!.at, startedAt: tuesdayEarly, autoEmail: true }));
+    expect(tuesdayMorning.actions.map((a) => a.key)).toEqual(['step:1']);
+  });
+
+  it('leaves email timing alone when autoEmail is false', () => {
+    const saturday = Date.parse('2026-09-05T15:00:00Z');
+    expect(planActions(input({ now: saturday, startedAt: saturday, autoEmail: false })).actions.map((a) => a.key)).toEqual(['step:1']);
+  });
+
   it('applies quiet hours to automatic texts only', () => {
     const late = Date.parse('2026-09-02T03:00:00Z'); // 22:00 in Chicago
     const sms = { ...customer, preferredChannel: 'sms' as const };
@@ -146,5 +177,36 @@ describe('payments and keywords', () => {
     expect(carrierKeyword(' stop. ')).toBe('stop');
     expect(carrierKeyword('please stop texting me')).toBeNull();
     expect(carrierKeyword('START')).toBe('start');
+  });
+});
+
+describe('email sending window', () => {
+  const TZ = 'America/Chicago';
+  const at = (iso: string) => Date.parse(iso);
+  const stamp = (ms: number) => {
+    const p = localParts(ms, TZ);
+    return [p.year, p.month, p.day, p.hour, p.minute];
+  };
+
+  it('allows weekdays 08:00–17:59 local and nothing on weekends', () => {
+    // Friday 2026-10-30, before the clocks fall back on 2026-11-01.
+    expect(isEmailAllowed(at('2026-10-30T13:00:00Z'), TZ)).toBe(true); // 08:00 CDT
+    expect(isEmailAllowed(at('2026-10-30T22:59:00Z'), TZ)).toBe(true); // 17:59 CDT
+    expect(isEmailAllowed(at('2026-10-30T23:00:00Z'), TZ)).toBe(false); // 18:00 CDT
+    expect(isEmailAllowed(at('2026-10-30T12:59:00Z'), TZ)).toBe(false); // 07:59 CDT
+    expect(isEmailAllowed(at('2026-10-31T15:00:00Z'), TZ)).toBe(false); // Saturday 10:00 CDT
+  });
+
+  it('steps over the 2026-11-01 DST change to Monday 08:00 CST', () => {
+    // Saturday 10:00 CDT, then Sunday noon CST across the fallback.
+    expect(stamp(nextEmailWindow(at('2026-10-31T15:00:00Z'), TZ))).toEqual([2026, 11, 2, 8, 0]);
+    expect(stamp(nextEmailWindow(at('2026-11-01T18:00:00Z'), TZ))).toEqual([2026, 11, 2, 8, 0]);
+    // Friday 18:00 CDT also waits for Monday, now at CST (UTC-6).
+    expect(nextEmailWindow(at('2026-10-30T23:00:00Z'), TZ)).toBe(at('2026-11-02T14:00:00Z'));
+  });
+
+  it('returns the instant itself when it is already inside the window', () => {
+    const inside = at('2026-10-30T16:00:00Z'); // 11:00 CDT Friday
+    expect(nextEmailWindow(inside, TZ)).toBe(inside);
   });
 });

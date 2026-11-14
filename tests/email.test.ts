@@ -34,12 +34,15 @@ afterEach(() => {
 });
 
 const CSV = 'Customer,Email,Invoice,Amount,Due\nDana,dana@x.co,#1,100,2026-01-01\nEli,eli@x.co,#2,200,2026-01-01\nFay,fay@x.co,#3,300,2026-01-01';
+// Automatic email only goes out on weekday working hours, so give these tests a
+// deterministic Tuesday noon in Chicago instead of whenever the suite happens to run.
+const AUTO_NOW = Date.parse('2026-11-10T18:00:00Z');
 
 async function autoBusiness(name: string) {
   const b = a.createBusiness({ name });
   await runAsBusiness(a.tenantOf(b), async () => {
     saveSettings({ businessName: name, replyToEmail: 'owner@harbor.test', mailingAddress: '1 Pier Rd, Portland, ME', deliveryMode: 'auto' });
-    await svc.importCsv(CSV);
+    await svc.importCsv(CSV, AUTO_NOW);
   });
   return b;
 }
@@ -97,7 +100,7 @@ describe('the new-account cap', () => {
     sentToday(b.id, 19);
     await runAsBusiness(a.tenantOf(b), async () => {
       saveSettings({ businessName: 'Busy First Day', replyToEmail: 'owner@busy.test', mailingAddress: '2 Main St', deliveryMode: 'auto' });
-      await svc.importCsv(CSV);
+      await svc.importCsv(CSV, AUTO_NOW);
       const statuses = repo.listCustomers().flatMap((c) => repo.listCustomerMessages(c.id).map((m) => m.status));
       expect(statuses.sort()).toEqual(['ready', 'ready', 'sent']);
     });
