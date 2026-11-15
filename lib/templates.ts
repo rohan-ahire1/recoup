@@ -1,5 +1,6 @@
 import { formatLongDate, money } from './format';
 import { daysOverdue } from './time';
+import type { CustomerType } from './types';
 
 export const TEMPLATE_VARIABLES = [
   'first_name',
@@ -37,7 +38,7 @@ export function joinList(items: string[]): string {
 }
 
 export interface VarsInput {
-  customer: { name: string; contactName: string | null; payToken: string };
+  customer: { name: string; contactName: string | null; type?: CustomerType; payToken: string };
   invoices: { number: string; owedCents: number; dueDate: string }[];
   businessName: string;
   senderName: string;
@@ -46,8 +47,26 @@ export interface VarsInput {
   installment?: { amountCents: number; dueAt: number };
 }
 
-export function firstName(customer: { name: string; contactName: string | null }): string {
-  return (customer.contactName || customer.name).trim().split(/\s+/)[0] || 'there';
+const HONORIFICS = new Set(['mr', 'mrs', 'ms', 'mx', 'miss', 'dr', 'prof']);
+
+/** First meaningful word of a name, skipping a leading honorific. */
+function firstWord(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const words = value.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return null;
+  const startsWithHonorific = HONORIFICS.has(words[0].replace(/\.$/, '').toLowerCase());
+  return words[startsWithHonorific ? 1 : 0] || null;
+}
+
+/** The person to address, or null when a business has no named contact. */
+export function personName(customer: { name: string; contactName: string | null; type?: CustomerType }): string | null {
+  if (customer.contactName && customer.contactName.trim()) return firstWord(customer.contactName);
+  if (!customer.type || customer.type === 'individual') return firstWord(customer.name);
+  return null;
+}
+
+export function firstName(customer: { name: string; contactName: string | null; type?: CustomerType }): string {
+  return personName(customer) ?? 'there';
 }
 
 export function templateVars(input: VarsInput): Record<string, string> {
