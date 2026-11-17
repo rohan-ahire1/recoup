@@ -1,14 +1,14 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 // Each run gets its own throwaway database.
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'recoup-test-'));
 process.env.DATA_DIR = dir;
 const { enterBusiness } = await import('../lib/tenant');
 const accounts = await import('../lib/accounts');
-enterBusiness(accounts.tenantOf(accounts.createBusiness({ name: 'Test' })));
+const tenant = accounts.tenantOf(accounts.createBusiness({ name: 'Test' }));
 
 const svc = await import('../lib/service');
 const repo = await import('../lib/repo');
@@ -30,7 +30,12 @@ const csv = [
 let harbor: number;
 let mika: number;
 
+beforeEach(() => {
+  enterBusiness(tenant);
+});
+
 beforeAll(async () => {
+  enterBusiness(tenant);
   setClockOffset(0);
   const result = await svc.importCsv(csv, day(0));
   expect(result.imported).toBe(4);

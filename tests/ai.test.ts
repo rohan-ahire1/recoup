@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'recoup-ai-'));
 const { enterBusiness } = await import('../lib/tenant');
 const accounts = await import('../lib/accounts');
-enterBusiness(accounts.tenantOf(accounts.createBusiness({ name: 'AI test' })));
+const tenant = accounts.tenantOf(accounts.createBusiness({ name: 'AI test' }));
 
 // Claude is mocked: each test queues the JSON it should "write".
 const { create } = vi.hoisted(() => ({ create: vi.fn() }));
@@ -27,6 +27,7 @@ const jevSays = (choice: string, confidence: number) =>
   );
 
 beforeEach(() => {
+  enterBusiness(tenant);
   create.mockReset();
   process.env.TYPESAFE_API_KEY = 'test-key';
 });
