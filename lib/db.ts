@@ -148,6 +148,10 @@ ALTER TABLE invoices ADD COLUMN qb_id TEXT;
 CREATE UNIQUE INDEX customers_qb ON customers(qb_id) WHERE qb_id IS NOT NULL;
 CREATE UNIQUE INDEX invoices_qb ON invoices(qb_id) WHERE qb_id IS NOT NULL;
 `,
+  `
+-- Set when the customer unsubscribes from reminder emails (List-Unsubscribe or the link in the footer).
+ALTER TABLE customers ADD COLUMN opted_out_email INTEGER NOT NULL DEFAULT 0;
+`,
 ];
 
 export function migrate(d: DatabaseSync, migrations: string[]) {

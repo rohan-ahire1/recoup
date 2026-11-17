@@ -21,7 +21,7 @@ const plain = <T>(r: unknown): T => ({ ...(r as object) }) as T;
 // ------------------------------------------------------------------ customers
 
 const CUSTOMER_COLS = `id, name, type, contact_name AS contactName, email, phone, preferred_channel AS preferredChannel,
-  tags, template_set_id AS templateSetId, do_not_chase AS doNotChase, opted_out_sms AS optedOutSms, notes,
+  tags, template_set_id AS templateSetId, do_not_chase AS doNotChase, opted_out_sms AS optedOutSms, opted_out_email AS optedOutEmail, notes,
   pay_token AS payToken, created_at AS createdAt`;
 
 const toCustomer = (r: Row): Customer => ({
@@ -29,6 +29,7 @@ const toCustomer = (r: Row): Customer => ({
   tags: JSON.parse(String(r.tags ?? '[]')),
   doNotChase: bool(r.doNotChase),
   optedOutSms: bool(r.optedOutSms),
+  optedOutEmail: bool(r.optedOutEmail),
 });
 
 export function getCustomer(id: number): Customer | undefined {

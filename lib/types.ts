@@ -33,6 +33,7 @@ export interface Customer {
   templateSetId: number | null;
   doNotChase: boolean;
   optedOutSms: boolean;
+  optedOutEmail: boolean;
   notes: string | null;
   payToken: string;
   createdAt: number;

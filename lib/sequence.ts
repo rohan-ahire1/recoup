@@ -45,7 +45,7 @@ export interface EngineInput {
   lastSentAt: number | null;
   /** A prepared message is still waiting for the owner to send it. */
   pendingReady: boolean;
-  customer: Pick<Customer, 'phone' | 'email' | 'optedOutSms' | 'preferredChannel' | 'doNotChase'>;
+  customer: Pick<Customer, 'phone' | 'email' | 'optedOutSms' | 'optedOutEmail' | 'preferredChannel' | 'doNotChase'>;
   sentKeys: Set<string>;
   installments: Pick<Installment, 'id' | 'seq' | 'dueAt' | 'paidAt'>[];
   now: number;
@@ -66,7 +66,7 @@ export function stepDueAt(startedAt: number, step: SequenceStep): number {
 
 export function availableChannels(c: EngineInput['customer']): Channel[] {
   const out: Channel[] = [];
-  if (c.email) out.push('email');
+  if (c.email && !c.optedOutEmail) out.push('email');
   if (c.phone && !c.optedOutSms) out.push('sms');
   return out;
 }
