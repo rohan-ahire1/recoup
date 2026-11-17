@@ -12,7 +12,7 @@
     "check:design": "node scripts/design-check.mjs"
   },
   "engines": {
-    "node": ">=22.5"
+    "node": ">=26.7 <27"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
@@ -23,7 +23,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.0",
-    "@types/node": "^22.15.0",
+    "@types/node": "^26.0.0",
     "@types/papaparse": "^5.3.15",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",

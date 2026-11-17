@@ -35,7 +35,7 @@ There is never more than one message waiting per customer, and always at least t
 
 - Next.js 15 (App Router, server actions), React 19, TypeScript
 - Tailwind CSS v4
-- SQLite through Node's built-in `node:sqlite` (Node 22.5+)
+- SQLite through Node's built-in `node:sqlite` (Node 26.7)
 - Resend for email, QuickBooks Online OAuth, Anthropic SDK
 - Vitest; GitHub Actions runs typecheck, tests and build on every push
 - Deployed on a single Linux server with systemd and Caddy
@@ -51,7 +51,7 @@ There is never more than one message waiting per customer, and always at least t
 
 ## Run it locally
 
-Requires Node 22.5 or newer.
+Requires Node 26.7 (see `.nvmrc`).
 
 ```bash
 npm install
