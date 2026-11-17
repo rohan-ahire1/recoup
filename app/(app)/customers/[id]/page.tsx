@@ -6,6 +6,7 @@ import {
   markInvoicePaidAction,
   pauseAction,
   recordPaymentAction,
+  resubscribeEmailAction,
   resumeAction,
   setToneAction,
   simulatePaymentAction,
@@ -252,6 +253,15 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
               <div>
                 <dt className="text-faint">Email</dt>
                 <dd className="break-words">{customer.email ?? '—'}</dd>
+                {customer.optedOutEmail && (
+                  <dd className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-rust">
+                    Unsubscribed from email
+                    <form action={resubscribeEmailAction}>
+                      <input type="hidden" name="customerId" value={customer.id} />
+                      <button type="submit" className="font-semibold text-teal hover:underline">Allow emails again</button>
+                    </form>
+                  </dd>
+                )}
               </div>
               <div>
                 <dt className="text-faint">Phone</dt>

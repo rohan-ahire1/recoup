@@ -159,6 +159,12 @@ export async function doNotChaseAction(form: FormData) {
   refresh();
 }
 
+export async function resubscribeEmailAction(form: FormData) {
+  enterBusiness(await requireBusiness());
+  await svc.resubscribeEmail(num(form, 'customerId'));
+  refresh();
+}
+
 export async function updateCustomerAction(form: FormData) {
   enterBusiness(await requireBusiness());
   const id = num(form, 'customerId');
