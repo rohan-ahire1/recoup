@@ -318,9 +318,9 @@ function autoSends(channel: Channel, settings: Settings): boolean {
   return settings.deliveryMode === 'auto' && providerFor(channel);
 }
 
-async function deliver(message: { channel: Channel; toAddr: string | null; subject: string | null; body: string }, settings: Settings): Promise<SendResult> {
+async function deliver(message: { channel: Channel; customerId: number; toAddr: string | null; subject: string | null; body: string }, settings: Settings): Promise<SendResult> {
   if (message.channel === 'sms') throw new Error('Texts are sent from the business’s own phone');
-  return sendBusinessEmail({ to: message.toAddr!, subject: message.subject ?? `Message from ${settings.businessName}`, text: message.body }, settings);
+  return sendBusinessEmail({ to: message.toAddr!, subject: message.subject ?? `Message from ${settings.businessName}`, text: message.body, unsubscribeToken: getCustomer(message.customerId)?.payToken }, settings);
 }
 
 function stepLabel(m: Pick<Message, 'step' | 'actionKey'>): string {
@@ -391,7 +391,7 @@ async function prepare(customer: Customer, c: Case, action: Action, now: number)
     logEvent(customer.id, c.id, 'prepared', `${label} ready to send by ${via}${blocked ? `. ${blocked} It waits for you.` : ''}`, now);
     return 'prepared' as const;
   }
-  const result = await deliver({ channel: action.channel, toAddr: to, subject, body }, settings);
+  const result = await deliver({ channel: action.channel, customerId: customer.id, toAddr: to, subject, body }, settings);
   if (result.status === 'failed') {
     updateMessage(claim.id, { status: 'failed', provider: result.provider, error: result.error ?? 'Unknown error' });
     logEvent(customer.id, c.id, 'send_failed', `${label} by ${via} failed: ${result.error}`, now);
@@ -628,9 +628,10 @@ export async function logReply(input: ReplyInput, now = getNow()) {
 
 async function applyReply(customer: Customer, c: Case | undefined, kind: ReplyKind, promiseDate: string | null, summary: string | null, now: number) {
   if (kind === 'stop') {
-    updateCustomer(customer.id, { opted_out_sms: 1, preferred_channel: customer.email ? 'email' : customer.preferredChannel });
+    const emailOpen = Boolean(customer.email) && !customer.optedOutEmail;
+    updateCustomer(customer.id, { opted_out_sms: 1, preferred_channel: emailOpen ? 'email' : customer.preferredChannel });
     if (c) {
-      const stillReachable = Boolean(customer.email);
+      const stillReachable = emailOpen;
       if (!stillReachable) setCaseStatus(c.id, 'unreachable', now);
       logEvent(customer.id, c.id, 'opted_out', stillReachable ? 'Texted STOP. No more texts; email continues.' : 'Texted STOP. No email on file, so reminders stopped.', now);
       refreshDraft(customer.id, now);
@@ -835,6 +836,40 @@ export async function setDoNotChase(customerId: number, on: boolean, now = getNo
   }
   logEvent(customerId, c?.id ?? null, on ? 'not_chasing' : 'chasing', on ? 'Marked “don’t chase”. You’ll handle this one personally.' : 'Reminders allowed again', now);
   if (!on) await runDueActions(now);
+}
+
+/**
+ * The customer unsubscribed from email. No more emails: switch to text if that's
+ * open to us, otherwise stop. Safe to call twice.
+ */
+export function unsubscribeEmail(customerId: number, now = getNow()) {
+  const customer = getCustomer(customerId);
+  if (!customer || customer.optedOutEmail) return;
+  const canText = Boolean(customer.phone) && !customer.optedOutSms;
+  updateCustomer(customerId, { opted_out_email: 1, ...(canText ? { preferred_channel: 'sms' } : {}) });
+  const c = getOpenCase(customerId);
+  if (c) {
+    if (!canText) {
+      setCaseStatus(c.id, 'unreachable', now);
+      const draft = readyMessageForCase(c.id);
+      if (draft) updateMessage(draft.id, { status: 'skipped' });
+    }
+    logEvent(customerId, c.id, 'opted_out', canText ? 'Unsubscribed from email. Reminders continue by text.' : 'Unsubscribed from email. No other way to reach them, so reminders stopped.', now);
+    if (canText) refreshDraft(customerId, now);
+  } else {
+    logEvent(customerId, null, 'opted_out', 'Unsubscribed from email.', now);
+  }
+}
+
+/** The business undoes an unsubscribe because the customer asked. */
+export async function resubscribeEmail(customerId: number, now = getNow()) {
+  const customer = getCustomer(customerId);
+  if (!customer?.optedOutEmail) return;
+  updateCustomer(customerId, { opted_out_email: 0 });
+  const c = getOpenCase(customerId);
+  if (c?.status === 'unreachable') setCaseStatus(c.id, 'active', now);
+  logEvent(customerId, c?.id ?? null, 'opted_in', 'Email reminders allowed again', now);
+  await runDueActions(now);
 }
 
 export function setCustomerTone(customerId: number, templateSetId: number | null, now = getNow()) {

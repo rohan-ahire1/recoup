@@ -32,13 +32,13 @@ async function resend<T>(path: string, init: { method?: string; body?: unknown }
   }
 }
 
-export async function sendEmail(opts: { to: string; subject: string; text: string; from: string; replyTo?: string }): Promise<SendResult> {
+export async function sendEmail(opts: { to: string; subject: string; text: string; from: string; replyTo?: string; headers?: Record<string, string> }): Promise<SendResult> {
   if (!resendConfigured()) {
     return { provider: 'mock', providerId: `mock_${randomBytes(6).toString('hex')}`, status: 'delivered' };
   }
   const r = await resend<{ id?: string }>('/emails', {
     method: 'POST',
-    body: { from: opts.from, to: [opts.to], subject: opts.subject, text: opts.text, ...(opts.replyTo ? { reply_to: opts.replyTo } : {}) },
+    body: { from: opts.from, to: [opts.to], subject: opts.subject, text: opts.text, ...(opts.replyTo ? { reply_to: opts.replyTo } : {}), ...(opts.headers ? { headers: opts.headers } : {}) },
   });
   if (!r.ok) return { provider: 'resend', providerId: null, status: 'failed', error: r.error };
   return { provider: 'resend', providerId: r.data.id ?? null, status: 'sent' };

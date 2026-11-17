@@ -49,7 +49,7 @@ describe('the shared sender', () => {
     await autoBusiness('Harbor Bakery');
     expect(sent).toHaveLength(3);
     expect(sent[0]).toMatchObject({ from: 'Harbor Bakery via Recoup <reminders@mail.recoup.test>', reply_to: 'owner@harbor.test' });
-    expect(String(sent[0].text)).toMatch(/--\nHarbor Bakery\n1 Pier Rd, Portland, ME\nReply to this email to reach them\.$/);
+    expect(String(sent[0].text)).toMatch(/--\nHarbor Bakery\n1 Pier Rd, Portland, ME\nReply to this email to reach them\.\nDon't want these emails\? Unsubscribe: \S+\/api\/unsubscribe\/\S+$/);
   });
 
   it('holds reminders back once the daily cap is reached', async () => {
