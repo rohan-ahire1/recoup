@@ -13,6 +13,7 @@ import { get, run } from './db';
 import { mailbox, resendConfigured, sendEmail, createDomain, deleteDomain, getDomain, verifyDomain, type SendResult } from './providers/email';
 import { logEvent, setCaseStatus, updateCase } from './repo';
 import type { Settings } from './settings';
+import { unsubscribeLink } from './templates';
 import { currentTenant, runAsBusiness } from './tenant';
 
 /**
@@ -73,16 +74,32 @@ export function sendingBlocked(businessId: string, now = Date.now()): string | n
 }
 
 /** The plain footer on every automatic email: who it's from and where they are. */
-export function footer(settings: Settings): string {
+export function footer(settings: Settings, unsubscribeToken?: string): string {
   const name = settings.businessName.replace(/\.$/, '');
-  return ['', '--', name, settings.mailingAddress.trim(), 'Reply to this email to reach them.'].filter((l, i) => i < 2 || l).join('\n');
+  return [
+    '',
+    '--',
+    name,
+    settings.mailingAddress.trim(),
+    'Reply to this email to reach them.',
+    unsubscribeToken ? `Don't want these emails? Unsubscribe: ${unsubscribeLink(unsubscribeToken)}` : '',
+  ]
+    .filter((l, i) => i < 2 || l)
+    .join('\n');
 }
 
-/** Send one reminder email for the current business. */
-export async function sendBusinessEmail(msg: { to: string; subject: string; text: string }, settings: Settings): Promise<SendResult> {
+/**
+ * Send one reminder email for the current business. `unsubscribeToken` is the
+ * customer's pay token; it adds the footer link and the one-click unsubscribe headers.
+ */
+export async function sendBusinessEmail(msg: { to: string; subject: string; text: string; unsubscribeToken?: string }, settings: Settings): Promise<SendResult> {
   const { businessId } = currentTenant();
   const sender = senderFor(businessId, settings);
-  const result = await sendEmail({ ...msg, text: msg.text + '\n' + footer(settings), ...sender });
+  const { unsubscribeToken, ...mail } = msg;
+  const headers = unsubscribeToken
+    ? { 'List-Unsubscribe': `<${unsubscribeLink(unsubscribeToken)}>`, 'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click' }
+    : undefined;
+  const result = await sendEmail({ ...mail, text: mail.text + '\n' + footer(settings, unsubscribeToken), ...sender, headers });
   if (result.status !== 'failed' && result.providerId && result.provider === 'resend') recordSentEmail(result.providerId, businessId);
   return result;
 }

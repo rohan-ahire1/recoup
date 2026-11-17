@@ -5,7 +5,7 @@ import { DAY, HOUR, localParts } from '../lib/time';
 const TZ = 'America/Chicago';
 const START = Date.parse('2026-09-01T15:00:00Z'); // 10:00 in Chicago
 
-const customer = { phone: '+13125550142', email: 'dana@example.com', optedOutSms: false, preferredChannel: 'email' as const, doNotChase: false };
+const customer = { phone: '+13125550142', email: 'dana@example.com', optedOutSms: false, optedOutEmail: false, preferredChannel: 'email' as const, doNotChase: false };
 
 function input(o: Partial<EngineInput> & { now: number }): EngineInput {
   return {

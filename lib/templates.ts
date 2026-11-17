@@ -30,6 +30,10 @@ export function payLink(payToken: string): string {
   return `${baseUrl()}/pay/${payToken}`;
 }
 
+export function unsubscribeLink(payToken: string): string {
+  return `${baseUrl()}/api/unsubscribe/${payToken}`;
+}
+
 /** "A, B and C" */
 export function joinList(items: string[]): string {
   if (items.length <= 1) return items[0] ?? '';
