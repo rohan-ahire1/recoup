@@ -677,6 +677,31 @@ async function applyReply(customer: Customer, c: Case | undefined, kind: ReplyKi
 
 // =================================================================== payments & plans
 
+/** A plan payment recorded without a specific installment pays them off in order, as far as the money plan payments so far reaches. */
+function markCoveredInstallments(caseId: number, now: number) {
+  const installments = listInstallments(caseId);
+  if (!installments.length) return;
+  const planStart = installments[0].dueAt; // the first installment is due when the plan is chosen
+  const paid = get<{ total: number }>(
+    'SELECT COALESCE(SUM(amount_cents), 0) AS total FROM payments WHERE case_id = ? AND paid_at >= ?',
+    caseId,
+    planStart,
+  )?.total ?? 0;
+  let cumulative = 0;
+  for (const inst of installments) {
+    cumulative += inst.amountCents;
+    if (cumulative > paid) break;
+    if (inst.paidAt) continue;
+    run('UPDATE installments SET paid_at = ? WHERE id = ?', now, inst.id);
+    const draft = get<{ id: number }>(
+      "SELECT id FROM messages WHERE case_id = ? AND status = 'ready' AND action_key = ?",
+      caseId,
+      `installment:${inst.id}`,
+    );
+    if (draft) updateMessage(draft.id, { status: 'skipped' });
+  }
+}
+
 export function recordPayment(opts: {
   customerId: number;
   amountCents: number;
@@ -714,6 +739,7 @@ export function recordPayment(opts: {
       updateInvoice(inv.id, { amount_paid_cents: paid, ...(paid >= inv.amountCents ? { status: 'paid', paid_date: t } : {}) }, now);
     }
     if (opts.installmentId) run('UPDATE installments SET paid_at = ? WHERE id = ?', now, opts.installmentId);
+    else if (c?.status === 'plan') markCoveredInstallments(c.id, now);
 
     const via: Record<string, string> = { manual: 'recorded by you', demo: 'simulated', quickbooks: 'in QuickBooks' };
     const stillOverdue = c ? caseInvoices(customer.id, c.id).reduce((s, i) => s + owed(i), 0) : 0;

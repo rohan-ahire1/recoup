@@ -114,3 +114,63 @@ describe('payment page', () => {
     expect(svc.summarizeCustomer(repo.getCustomer(mika)!, day(11)).openCase).toBeUndefined();
   });
 });
+
+describe('plan payments mark installments paid', () => {
+  const planCsv = (name: string, amount: number) =>
+    ['Customer,Contact,Email,Phone,Invoice,Description,Amount,Due,Paid', `${name},Pat,${name.replace(/ /g, '').toLowerCase()}@x.co,,#${name.replace(/ /g, '')},Job,${amount},${date(-3)},`].join('\n');
+
+  async function startPlan(name: string, amount: number, count: 2 | 3 = 3) {
+    await svc.importCsv(planCsv(name, amount), day(20));
+    const id = repo.findCustomer({ name })!.id;
+    const installments = svc.choosePlan(id, count, day(20));
+    return { id, caseId: installments[0].caseId, installments };
+  }
+
+  it('applies a manual payment to installments in order', async () => {
+    const { id, caseId, installments } = await startPlan('Plan Order Co', 900);
+    const [a, b] = installments;
+    svc.recordPayment({ customerId: id, amountCents: a.amountCents + b.amountCents, source: 'manual', now: day(21) });
+    const after = repo.listInstallments(caseId);
+    expect(after[0].paidAt).toBe(day(21));
+    expect(after[1].paidAt).toBe(day(21));
+    expect(after[2].paidAt).toBeFalsy();
+  });
+
+  it('marks nothing for a payment smaller than one installment, then covers it cumulatively', async () => {
+    const { id, caseId, installments } = await startPlan('Plan Partial Co', 900);
+    const first = installments[0].amountCents;
+    svc.recordPayment({ customerId: id, amountCents: first - 100, source: 'manual', now: day(21) });
+    expect(repo.listInstallments(caseId).every((i) => !i.paidAt)).toBe(true);
+    svc.recordPayment({ customerId: id, amountCents: 100, source: 'manual', now: day(22) });
+    const after = repo.listInstallments(caseId);
+    expect(after[0].paidAt).toBe(day(22));
+    expect(after[1].paidAt).toBeFalsy();
+  });
+
+  it('resolves the case once every installment is covered', async () => {
+    const { id, caseId, installments } = await startPlan('Plan Done Co', 900);
+    svc.recordPayment({ customerId: id, amountCents: installments[0].amountCents, source: 'manual', now: day(21) });
+    svc.recordPayment({ customerId: id, amountCents: installments[1].amountCents + installments[2].amountCents, source: 'manual', now: day(22) });
+    expect(repo.listInstallments(caseId).every((i) => i.paidAt)).toBe(true);
+    expect(repo.getOpenCase(id)).toBeUndefined();
+  });
+
+  it('marks only the given installment when an installmentId is passed', async () => {
+    const { id, caseId, installments } = await startPlan('Plan Explicit Co', 900);
+    svc.recordPayment({ customerId: id, amountCents: installments[0].amountCents, installmentId: installments[1].id, source: 'manual', now: day(21) });
+    const after = repo.listInstallments(caseId);
+    expect(after.map((i) => !!i.paidAt)).toEqual([false, true, false]);
+  });
+
+  it('skips the ready reminder of an installment that is now paid', async () => {
+    const { id, caseId, installments } = await startPlan('Plan Reminder Co', 900);
+    const second = installments[1];
+    await svc.runDueActions(second.dueAt - DAY / 2);
+    const key = `installment:${second.id}`;
+    const ready = repo.listMessagesByStatus(['ready']).find((m) => m.actionKey === key);
+    expect(ready).toBeDefined();
+    svc.recordPayment({ customerId: id, amountCents: installments[0].amountCents + second.amountCents, source: 'manual', now: second.dueAt });
+    expect(repo.getMessage(ready!.id)!.status).toBe('skipped');
+    expect(repo.listInstallments(caseId)[1].paidAt).toBeTruthy();
+  });
+});
