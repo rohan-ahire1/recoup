@@ -59,6 +59,28 @@ export function findCustomer(by: { name?: string; email?: string | null; phone?:
   return undefined;
 }
 
+/**
+ * The customer an incoming person most likely is: email first, then phone. A name
+ * match counts only when it doesn't conflict (its email and phone are empty or
+ * equal to the incoming ones), so two people sharing a name stay separate.
+ * `sameNameConflict` is true when the name matched but only conflicting customers.
+ */
+export function matchCustomer(by: { name?: string; email?: string | null; phone?: string | null }): {
+  customer?: Customer;
+  sameNameConflict: boolean;
+} {
+  for (const [where, value] of [['email = ?', by.email], ['phone = ?', by.phone]] as const) {
+    if (!value) continue;
+    const r = get<Row>(`SELECT ${CUSTOMER_COLS} FROM customers WHERE ${where} ORDER BY id LIMIT 1`, value);
+    if (r) return { customer: toCustomer(r), sameNameConflict: false };
+  }
+  if (!by.name) return { sameNameConflict: false };
+  const named = all<Row>(`SELECT ${CUSTOMER_COLS} FROM customers WHERE name = ? COLLATE NOCASE ORDER BY id`, by.name).map(toCustomer);
+  const agrees = (have: string | null, want: string | null | undefined) => !have || !want || have.toLowerCase() === want.toLowerCase();
+  const customer = named.find((c) => agrees(c.email, by.email) && agrees(c.phone, by.phone));
+  return { customer, sameNameConflict: !customer && named.length > 0 };
+}
+
 export function updateCustomer(id: number, fields: Record<string, string | number | null>) {
   const cols = Object.keys(fields);
   if (!cols.length) return;
