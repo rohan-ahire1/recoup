@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { gmailLink, mailtoLink, outlookLink, smsLink } from '../lib/compose';
 import { normalizePhone, parseAmount, parseDue, parseInvoiceCsv } from '../lib/csv';
 import { summarize, trackRecord } from '../lib/history';
-import { renderTemplate, templateVars } from '../lib/templates';
+import { firstName, personName, renderTemplate, templateVars } from '../lib/templates';
 import { BUILTIN_TONES } from '../lib/tones';
 
 const NOW = Date.parse('2026-09-26T15:00:00Z');
@@ -101,6 +101,19 @@ describe('templates and send links', () => {
         expect(t.sms, `${tone.name} ${key} sms`).toMatch(/Reply STOP to opt out\.$/);
       }
     }
+  });
+
+  it('picks a person name only when there is one', () => {
+    expect(personName({ name: 'Acme', contactName: 'Dr. Priya Shah', type: 'business' })).toBe('Priya');
+    expect(personName({ name: 'Dr Priya Shah', contactName: null, type: 'individual' })).toBe('Priya');
+    expect(personName({ name: 'Mika Tanaka', contactName: null, type: 'individual' })).toBe('Mika');
+    expect(personName({ name: 'Mika Tanaka', contactName: null })).toBe('Mika');
+    expect(personName({ name: 'Acme', contactName: 'Dana Ruiz', type: 'business' })).toBe('Dana');
+    expect(personName({ name: 'Acme', contactName: 'Dr.', type: 'business' })).toBeNull();
+    const oak = { name: 'The Oak Room', contactName: null, type: 'business' as const };
+    expect(personName(oak)).toBeNull();
+    expect(firstName(oak)).toBe('there');
+    expect(templateVars({ customer: { ...oak, payToken: 't' }, invoices: [], businessName: 'B', senderName: 'S', timeZone: 'America/Chicago', now: NOW }).first_name).toBe('there');
   });
 
   it('builds prefilled compose links', () => {

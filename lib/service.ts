@@ -48,7 +48,7 @@ import {
   type TemplateKey,
 } from './sequence';
 import { getClockOffset, getNow, getSettings, setClockOffset, type Settings } from './settings';
-import { firstName, renderTemplate, templateVars } from './templates';
+import { personName, renderTemplate, templateVars } from './templates';
 import { currentTenant } from './tenant';
 import { DAY, daysOverdue, localDate, monthKey, nextSmsWindow } from './time';
 import type { TemplateSetContent } from './tones';
@@ -573,7 +573,7 @@ export async function personalizeDraft(messageId: number) {
     subject: m.subject,
     body: m.body,
     tone: m.tone ?? 'friendly',
-    customerSummary: summarize(record, firstName(customer)),
+    customerSummary: summarize(record, personName(customer) ?? customer.name),
     recentConversation: convo,
   });
   updateMessage(m.id, { subject: m.channel === 'email' ? out.subject : null, body: out.body });
@@ -941,7 +941,7 @@ export function summarizeCustomer(customer: Customer, now = getNow()): CustomerS
     openCount: open.length,
     oldestOverdueDays: overdue.length ? daysOverdue(overdue.reduce((a, b) => (a.dueDate < b.dueDate ? a : b)).dueDate, now, getSettings().timezone) : 0,
     record,
-    summaryLine: summarize(record, firstName(customer)),
+    summaryLine: summarize(record, personName(customer) ?? customer.name),
     tone: toneFor(customer, record),
     next: nextFor(customer, openCase, now),
     ready: openCase ? readyMessageForCase(openCase.id) : undefined,
