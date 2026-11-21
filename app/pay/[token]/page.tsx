@@ -7,7 +7,7 @@ import { formatLongDate, formatShortDate, money, moneyShort } from '@/lib/format
 import { enterPayLink } from '@/lib/pay-access';
 import { getCustomerByToken, getOpenCase, listInstallments } from '@/lib/repo';
 import { PLAN_OFFER_STEP, splitInstallments } from '@/lib/sequence';
-import { payableInvoices } from '@/lib/service';
+import { payableInvoices, planBalanceCents } from '@/lib/service';
 import { getNow, getSettings } from '@/lib/settings';
 import { firstName } from '@/lib/templates';
 import { daysBetween, localDate } from '@/lib/time';
@@ -67,6 +67,7 @@ export default async function PayPage({
   const c = getOpenCase(customer.id);
   const invoices = payableInvoices(customer);
   const total = invoices.reduce((s, i) => s + i.amountCents - i.amountPaidCents, 0);
+  const planTotal = planBalanceCents(customer);
   const installments = c?.status === 'plan' ? listInstallments(c.id) : [];
   const nextInstallment = installments.find((i) => !i.paidAt);
   const planOffered = Boolean(c && c.status !== 'plan' && (c.currentStep >= PLAN_OFFER_STEP || query.plan));
@@ -137,7 +138,7 @@ export default async function PayPage({
                   <p className="mt-1 text-muted">Pay part now and the rest every two weeks. No fees.</p>
                   <div className="mt-4 flex flex-col gap-2">
                     {[2, 3].map((count) => {
-                      const parts = splitInstallments(total, count);
+                      const parts = splitInstallments(planTotal, count);
                       return (
                         <form key={count} action={`/api/pay/${token}`} method="post">
                           <input type="hidden" name="action" value="plan" />
