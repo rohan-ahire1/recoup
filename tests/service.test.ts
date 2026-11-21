@@ -114,3 +114,25 @@ describe('payment page', () => {
     expect(svc.summarizeCustomer(repo.getCustomer(mika)!, day(11)).openCase).toBeUndefined();
   });
 });
+
+describe('payment plan balance', () => {
+  it('splits only the case’s undisputed balance, the same number the pay page previews', async () => {
+    const plansCsv = [
+      'Customer,Contact,Email,Phone,Invoice,Description,Amount,Due,Paid',
+      `Plan Co,Pat,pat@x.co,,#P1,Overdue,300,${date(11)},`,
+      `Plan Co,Pat,pat@x.co,,#P2,Disputed,500,${date(11)},`,
+      `Plan Co,Pat,pat@x.co,,#P3,Later,200,${date(40)},`,
+    ].join('\n');
+    await svc.importCsv(plansCsv, day(20));
+    const planCo = repo.findCustomer({ name: 'Plan Co' })!;
+    await svc.runDueActions(day(20));
+    const disputed = repo.openInvoices(planCo.id).find((i) => i.number === 'P2')!;
+    repo.updateInvoice(disputed.id, { status: 'disputed' }, day(20));
+
+    expect(svc.planBalanceCents(planCo)).toBe(30000);
+    const installments = svc.choosePlan(planCo.id, 2, day(20));
+    expect(installments.reduce((s, i) => s + i.amountCents, 0)).toBe(30000);
+    expect(svc.planBalanceCents(planCo)).toBe(30000);
+    expect(repo.listEvents(planCo.id).some((e) => e.type === 'plan' && e.detail?.includes('$150.00'))).toBe(true);
+  });
+});
