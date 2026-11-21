@@ -1,3 +1,4 @@
+import Papa from 'papaparse';
 import { listAllInvoices, listCustomers } from './repo';
 import { ageBucket } from './service';
 import { getSettings } from './settings';
@@ -45,4 +46,27 @@ export function invoiceRows(q: InvoiceQuery, now: number): InvoiceRow[] {
     customer: (a, b) => a.customer.name.localeCompare(b.customer.name),
   };
   return out.sort(sorts[q.sort ?? 'due'] ?? sorts.due);
+}
+
+/** The Invoices export as CSV. Cells starting with = + - @ (or tab/CR) are prefixed with ' so spreadsheets don't run them as formulas. */
+export function invoiceCsv(rows: InvoiceRow[]): string {
+  return Papa.unparse(
+    rows.map((r) => ({
+      Invoice: `#${r.number}`,
+      Customer: r.customer.name,
+      Type: r.customer.type,
+      Contact: r.customer.contactName ?? '',
+      Email: r.customer.email ?? '',
+      Phone: r.customer.phone ?? '',
+      Description: r.description ?? '',
+      Amount: (r.amountCents / 100).toFixed(2),
+      'Amount paid': (r.amountPaidCents / 100).toFixed(2),
+      Issued: r.issuedDate ?? '',
+      Due: r.dueDate,
+      Paid: r.paidDate ?? '',
+      Status: r.state.replace('_', ' '),
+      'Days late': r.state === 'overdue' || r.state === 'paid' ? String(r.daysLate) : '',
+    })),
+    { escapeFormulae: true },
+  );
 }
