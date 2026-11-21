@@ -28,7 +28,7 @@ import { getCustomer, listCustomerInvoices, listCustomerMessages, listEvents, li
 import { STEPS } from '@/lib/sequence';
 import { summarizeCustomer } from '@/lib/service';
 import { getNow, getSettings } from '@/lib/settings';
-import { firstName as firstNameOf, payLink } from '@/lib/templates';
+import { payLink, personName } from '@/lib/templates';
 import { enterBusiness } from '@/lib/tenant';
 import { daysBetween, localDate } from '@/lib/time';
 import type { CustomerEvent, Invoice, Message } from '@/lib/types';
@@ -145,7 +145,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   const { timezone } = getSettings();
   const s = summarizeCustomer(customer, now);
   const c = s.openCase;
-  const first = firstNameOf(customer);
+  const first = personName(customer) ?? customer.name;
   const invoices = listCustomerInvoices(customer.id);
   const t = localDate(now, timezone);
   const open = invoices
