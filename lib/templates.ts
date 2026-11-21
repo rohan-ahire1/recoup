@@ -37,7 +37,7 @@ export function joinList(items: string[]): string {
 }
 
 export interface VarsInput {
-  customer: { name: string; contactName: string | null; payToken: string };
+  customer: { name: string; contactName: string | null; type?: 'business' | 'individual'; payToken: string };
   invoices: { number: string; owedCents: number; dueDate: string }[];
   businessName: string;
   senderName: string;
@@ -46,8 +46,24 @@ export interface VarsInput {
   installment?: { amountCents: number; dueAt: number };
 }
 
-export function firstName(customer: { name: string; contactName: string | null }): string {
-  return (customer.contactName || customer.name).trim().split(/\s+/)[0] || 'there';
+const HONORIFIC = /^(mr|mrs|ms|mx|miss|dr|prof)\.?$/i;
+
+function firstWord(text: string): string | null {
+  const words = text.trim().split(/\s+/).filter(Boolean);
+  if (words.length && HONORIFIC.test(words[0])) words.shift();
+  return words[0] ?? null;
+}
+
+/** A real person's first name, or null when we only know a business name. */
+export function personName(customer: { name: string; contactName: string | null; type?: 'business' | 'individual' }): string | null {
+  if (customer.contactName?.trim()) return firstWord(customer.contactName);
+  if (customer.type === 'business') return null;
+  return firstWord(customer.name);
+}
+
+/** For greetings: "Hi there,". */
+export function firstName(customer: { name: string; contactName: string | null; type?: 'business' | 'individual' }): string {
+  return personName(customer) ?? 'there';
 }
 
 export function templateVars(input: VarsInput): Record<string, string> {
