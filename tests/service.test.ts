@@ -114,3 +114,44 @@ describe('payment page', () => {
     expect(svc.summarizeCustomer(repo.getCustomer(mika)!, day(11)).openCase).toBeUndefined();
   });
 });
+
+describe('matching customers on import', () => {
+  const head = 'Customer,Email,Phone,Invoice,Amount,Due,Paid';
+  const named = (name: string) => repo.listCustomers().filter((c) => c.name === name);
+
+  it('keeps two people with the same name apart when their emails differ', async () => {
+    await svc.importCsv(
+      [head, `John Smith,john1@x.co,,#J1,100,${date(-5)},`, `John Smith,john2@x.co,,#J2,200,${date(-5)},`].join('\n'),
+      day(20),
+    );
+    const johns = named('John Smith');
+    expect(johns.map((c) => c.email).sort()).toEqual(['john1@x.co', 'john2@x.co']);
+    const second = johns.find((c) => c.email === 'john2@x.co')!;
+    expect(repo.listCustomerInvoices(second.id).map((i) => i.number)).toEqual(['J2']);
+  });
+
+  it('warns in the preview when a name matches but the contact details conflict', () => {
+    const p = svc.previewImport([head, `John Smith,john3@x.co,,#J3,100,${date(-5)},`].join('\n'), day(20));
+    expect(p.rows[0].existingCustomer).toBe(false);
+    expect(p.rows[0].warnings).toContain('Same name as an existing customer but different contact details; added as a new customer');
+  });
+
+  it('merges the same name with the same email, and a row with no contact details', async () => {
+    await svc.importCsv(
+      [head, `Ana Lopez,ana@x.co,,#A1,100,${date(-5)},`, `Ana Lopez,ana@x.co,,#A2,100,${date(-4)},`, `Ana Lopez,,,#A3,50,${date(-90)},${date(-80)}`].join('\n'),
+      day(20),
+    );
+    const anas = named('Ana Lopez');
+    expect(anas).toHaveLength(1);
+    expect(repo.listCustomerInvoices(anas[0].id)).toHaveLength(3);
+    const p = svc.previewImport([head, `Ana Lopez,ana@x.co,,#A9,100,${date(-5)},`].join('\n'), day(20));
+    expect(p.rows[0].existingCustomer).toBe(true);
+    expect(p.rows[0].warnings).toEqual([]);
+  });
+
+  it('joins an existing customer by email even when the name differs', async () => {
+    await svc.importCsv([head, `Ana L. Lopez,ana@x.co,,#A4,100,${date(-5)},`].join('\n'), day(20));
+    expect(named('Ana L. Lopez')).toHaveLength(0);
+    expect(repo.listCustomerInvoices(named('Ana Lopez')[0].id)).toHaveLength(4);
+  });
+});
