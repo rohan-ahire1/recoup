@@ -1,34 +1,11 @@
 /** @type {import('next').NextConfig} */
-const isProd = process.env.NODE_ENV === 'production';
-
-// The portfolio desktop at rohanahire.com opens Recoup in a window; nothing else may frame it.
-// FRAME_ANCESTORS adds space-separated origins, e.g. for testing the portfolio locally.
-const frameAncestors = ['https://rohanahire.com', ...(process.env.FRAME_ANCESTORS ?? '').split(/\s+/).filter(Boolean)];
-
+// The Content-Security-Policy is set per request in middleware.ts (it carries a nonce).
 const securityHeaders = [
   { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
-  // The dev server needs eval for fast refresh, so the policy only applies to production builds.
-  isProd && {
-    key: 'Content-Security-Policy',
-    value: [
-      "default-src 'self'",
-      // Next.js inlines its bootstrap scripts and styles.
-      "script-src 'self' 'unsafe-inline'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
-      "font-src 'self' data:",
-      "connect-src 'self'",
-      `frame-ancestors ${frameAncestors.join(' ')}`,
-      "base-uri 'self'",
-      // Server actions post to this origin; the QuickBooks sign-in is a plain link.
-      "form-action 'self'",
-      "object-src 'none'",
-    ].join('; '),
-  },
-].filter(Boolean);
+];
 
 const nextConfig = {
   poweredByHeader: false,

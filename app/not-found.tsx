@@ -1,7 +1,10 @@
 import Link from 'next/link';
+import { connection } from 'next/server';
 import { buttonClass } from './components/ui';
 
-export default function NotFound() {
+// Reading the request makes this render per request, so Next can stamp the CSP nonce on its scripts.
+export default async function NotFound() {
+  await connection();
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-4 py-16">
       <h1 className="display text-title font-bold">Page not found</h1>
