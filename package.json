@@ -9,6 +9,7 @@
     "test": "vitest run",
     "seed": "NODE_OPTIONS=--disable-warning=ExperimentalWarning tsx scripts/seed.ts",
     "typecheck": "tsc --noEmit",
+    "e2e": "playwright test",
     "check:design": "node scripts/design-check.mjs"
   },
   "engines": {
@@ -22,6 +23,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "@tailwindcss/postcss": "^4.1.0",
     "@types/node": "^22.15.0",
     "@types/papaparse": "^5.3.15",
