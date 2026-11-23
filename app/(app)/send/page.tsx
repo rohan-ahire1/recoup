@@ -20,6 +20,7 @@ export const dynamic = 'force-dynamic';
 
 function labelOf(m: Message) {
   if (m.step) return STEPS.find((s) => s.step === m.step)!.label;
+  if (m.actionKey?.startsWith('installment-missed')) return 'Missed payment follow-up';
   if (m.actionKey?.startsWith('installment')) return 'Payment plan reminder';
   if (m.actionKey?.startsWith('reply-plan')) return 'Payment plan offer';
   return 'Message';

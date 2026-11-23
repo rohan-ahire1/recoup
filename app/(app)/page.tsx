@@ -284,7 +284,7 @@ export default async function Today() {
             <ul className="-mx-3 flex flex-col">
               {ready.slice(0, 5).map((m) => {
                 const s = byId.get(m.customerId)!;
-                const label = m.step ? STEPS.find((x) => x.step === m.step)!.label : m.actionKey?.startsWith('installment') ? 'Payment plan reminder' : 'Payment plan offer';
+                const label = m.step ? STEPS.find((x) => x.step === m.step)!.label : m.actionKey?.startsWith('installment') ? (m.actionKey?.startsWith('installment-missed') ? 'Missed payment follow-up' : 'Payment plan reminder') : 'Payment plan offer';
                 return (
                   <li key={m.id}>
                     <Link href={`/customers/${m.customerId}`} className="ease group flex items-center gap-4 rounded-block px-3 py-3 hover:bg-linen/60">

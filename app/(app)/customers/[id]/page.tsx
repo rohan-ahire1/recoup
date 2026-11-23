@@ -220,7 +220,7 @@ export default async function CustomerPage({ params }: { params: Promise<{ id: s
   );
 
   const stepInfo = s.ready?.step ? STEPS.find((x) => x.step === s.ready!.step) : null;
-  const readyLabel = stepInfo?.label ?? (s.ready?.actionKey?.startsWith('installment') ? 'Payment plan reminder' : 'Payment plan offer');
+  const readyLabel = stepInfo?.label ?? (s.ready?.actionKey?.startsWith('installment') ? (s.ready?.actionKey?.startsWith('installment-missed') ? 'Missed payment follow-up' : 'Payment plan reminder') : 'Payment plan offer');
   const selectedSet = customer.templateSetId ?? 'default';
   const input = `mt-1 h-11 ${FIELD}`;
 
