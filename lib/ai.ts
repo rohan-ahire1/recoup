@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { aiCallsThisMonth, takeAiCall } from './accounts';
 import { formatDateLong } from './format';
 import { allow } from './rate-limit';
-import type { TemplateKey } from './sequence';
+import { TEMPLATE_KEYS } from './sequence';
 import { currentTenant } from './tenant';
 import type { MessageTemplate, TemplateSetContent } from './tones';
 import { asChoice, askJev, jevEnabled, type ChoiceAnswer } from './jev';
@@ -115,7 +115,7 @@ ${input.body}`;
 const templateSchema = {
   type: 'object',
   properties: Object.fromEntries(
-    ['1', '2', '3', '4', 'installment'].map((k) => [
+    [...TEMPLATE_KEYS].map((k) => [
       `step_${k}`,
       {
         type: 'object',
@@ -125,21 +125,20 @@ const templateSchema = {
       },
     ]),
   ),
-  required: ['step_1', 'step_2', 'step_3', 'step_4', 'step_installment'],
+  required: TEMPLATE_KEYS.map((k) => `step_${k}`),
   additionalProperties: false,
 };
 
 /** Write a whole template set (every step, email and text) from a description. */
 export async function generateTemplateSet(description: string, example: TemplateSetContent): Promise<TemplateSetContent> {
   const prompt = `Write a new set of reminder templates in this style: "${description}".
-There are five messages: step 1 (friendly first reminder), step 2 (follow-up with payment link), step 3 (payment link, a little firmer),
-step 4 (offer to split into 2 or 3 payments using {plan_link}), and installment (reminder that a plan payment is due).
+There are six messages: step 1 (friendly first reminder), step 2 (follow-up with payment link), step 3 (payment link, a little firmer),
+step 4 (offer to split into 2 or 3 payments using {plan_link}), installment (reminder that a plan payment is due the next day), and installment_missed (a polite note that a plan payment is a few days late; no threats, and no mention of agencies, credit reporting or legal action).
 Available placeholders: {first_name} {business_name} {sender_name} {signoff} {invoices} {invoices_detail} {is_are} {total} {oldest_days} {pay_link} {plan_link} {installment_amount} {installment_due_date}.
 Here is an existing set for structure only; do not copy its wording:
 ${JSON.stringify(example)}`;
   const out = await jsonCall<Record<string, MessageTemplate>>(VOICE, prompt, templateSchema, 8000);
-  const keys: TemplateKey[] = ['1', '2', '3', '4', 'installment'];
-  return Object.fromEntries(keys.map((k) => [k, out[`step_${k}`]])) as TemplateSetContent;
+  return Object.fromEntries(TEMPLATE_KEYS.map((k) => [k, out[`step_${k}`]])) as TemplateSetContent;
 }
 
 type ReplyRead = { kind: Exclude<ReplyKind, 'stop'>; promiseDate: string | null; summary: string };

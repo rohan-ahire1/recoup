@@ -15,6 +15,7 @@ import { enterBusiness } from '@/lib/tenant';
 export const dynamic = 'force-dynamic';
 
 function stepTitle(key: TemplateKey) {
+  if (key === 'installment_missed') return 'Missed payment · a few days after a plan payment is missed';
   if (key === 'installment') return 'Payment plan reminder · the day before each payment';
   const s = STEPS.find((x) => String(x.step) === key)!;
   return `Day ${s.day} · ${s.label}`;

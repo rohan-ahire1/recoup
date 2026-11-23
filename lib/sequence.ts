@@ -21,8 +21,13 @@ export const INSTALLMENT_INTERVAL_DAYS = 14;
 /** Never message the same customer twice within this window. */
 export const MIN_GAP_DAYS = 2;
 
-export type TemplateKey = '1' | '2' | '3' | '4' | 'installment';
-export const TEMPLATE_KEYS: TemplateKey[] = ['1', '2', '3', '4', 'installment'];
+export type TemplateKey = '1' | '2' | '3' | '4' | 'installment' | 'installment_missed';
+export const TEMPLATE_KEYS: TemplateKey[] = ['1', '2', '3', '4', 'installment', 'installment_missed'];
+
+/** An unpaid installment this many days past due gets one "missed payment" message. */
+export const MISSED_MESSAGE_AFTER_DAYS = 3;
+/** ...and is flagged for the owner's attention this many days past due. */
+export const MISSED_ATTENTION_AFTER_DAYS = 7;
 
 export interface Action {
   /** Idempotency key: each key is prepared at most once per case. */
@@ -128,7 +133,22 @@ export function planActions(input: EngineInput): EnginePlan {
       // The first installment is paid when the plan is chosen.
       if (inst.paidAt || inst.seq === 1) continue;
       const key = `installment:${inst.id}`;
-      if (sentKeys.has(key)) continue;
+      const missedKey = `installment-missed:${inst.id}`;
+      const missedAt = inst.dueAt + MISSED_MESSAGE_AFTER_DAYS * DAY;
+      if (now > missedAt) {
+        // Past the reminder window: one polite follow-up instead, never both in a burst.
+        if (sentKeys.has(missedKey)) continue;
+        if (canSendNow) {
+          actions.push({ key: missedKey, channel, templateKey: 'installment_missed', installmentId: inst.id });
+        } else {
+          next = earliest(next, { at: quiet(Math.max(now, gapUntil)), label: `Missed payment ${inst.seq}` });
+        }
+        break;
+      }
+      if (sentKeys.has(key)) {
+        next = earliest(next, { at: quiet(Math.max(missedAt + 1, gapUntil)), label: `Missed payment ${inst.seq}` });
+        continue;
+      }
       const remindAt = inst.dueAt - DAY;
       const label = `Reminder for payment ${inst.seq}`;
       if (remindAt <= now && canSendNow) {
