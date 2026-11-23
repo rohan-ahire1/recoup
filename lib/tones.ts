@@ -48,6 +48,11 @@ export const BUILTIN_TONES: BuiltinTone[] = [
         email: `Hi {first_name},\n\nA reminder that your next payment of {installment_amount} is due {installment_due_date}. You can pay here:\n{pay_link}\n\nThanks for keeping on track!\n{signoff}`,
         sms: `Hi {first_name}, reminder from {business_name}: your next payment of {installment_amount} is due {installment_due_date}. How to pay: {pay_link} ${STOP}`,
       },
+      installment_missed: {
+        subject: 'We missed your payment for {invoices}',
+        email: `Hi {first_name},\n\nWe haven't received your payment of {installment_amount}, which was due {installment_due_date}. These things happen, so no worries. You can pay here:\n{pay_link}\n\nIf something's come up and you need a different date, just reply and we'll sort it out together.\n\nThanks,\n{signoff}`,
+        sms: `Hi {first_name}, {business_name} here. We haven't received your payment of {installment_amount}, due {installment_due_date}. No worries, you can pay here: {pay_link} Need more time? Just reply. ${STOP}`,
+      },
     },
   },
   {
@@ -79,6 +84,11 @@ export const BUILTIN_TONES: BuiltinTone[] = [
         subject: 'Upcoming installment: {installment_amount} due {installment_due_date}',
         email: `Dear {first_name},\n\nThis is a reminder that your next installment of {installment_amount} is due on {installment_due_date}. You can pay securely here:\n{pay_link}\n\nKind regards,\n{signoff}`,
         sms: `Hello {first_name}, your installment of {installment_amount} to {business_name} is due {installment_due_date}. Pay here: {pay_link} ${STOP}`,
+      },
+      installment_missed: {
+        subject: 'Missed installment: {installment_amount} due {installment_due_date}',
+        email: `Dear {first_name},\n\nOur records show that your installment of {installment_amount}, due on {installment_due_date}, has not yet been received. You can pay securely here:\n{pay_link}\n\nIf you have already paid, thank you. If you need to adjust the schedule, please reply to this email and we will be glad to help.\n\nKind regards,\n{signoff}`,
+        sms: `Hello {first_name}, {business_name} has not yet received your installment of {installment_amount}, due {installment_due_date}. Pay here: {pay_link} Need to adjust the schedule? Reply to this message. ${STOP}`,
       },
     },
   },
@@ -112,6 +122,11 @@ export const BUILTIN_TONES: BuiltinTone[] = [
         email: `Hi {first_name},\n\nNext payment: {installment_amount}, due {installment_due_date}. Pay here: {pay_link}\n\n{signoff}`,
         sms: `{business_name}: next payment {installment_amount} due {installment_due_date}. {pay_link} ${STOP}`,
       },
+      installment_missed: {
+        subject: 'Missed payment: {installment_amount}',
+        email: `Hi {first_name},\n\nWe haven't received your {installment_amount} payment, due {installment_due_date}. Pay here: {pay_link}\n\nNeed more time? Just reply.\n\n{signoff}`,
+        sms: `{business_name}: we haven't received your {installment_amount} payment, due {installment_due_date}. {pay_link} Need more time? Reply here. ${STOP}`,
+      },
     },
   },
   {
@@ -144,6 +159,17 @@ export const BUILTIN_TONES: BuiltinTone[] = [
         email: `Hi {first_name},\n\nYour installment of {installment_amount} is due {installment_due_date}. Please pay on time to keep your plan in place:\n{pay_link}\n\nThank you,\n{signoff}`,
         sms: `Hi {first_name}, your installment of {installment_amount} to {business_name} is due {installment_due_date}: {pay_link} ${STOP}`,
       },
+      installment_missed: {
+        subject: 'Payment not received: {installment_amount}',
+        email: `Hi {first_name},\n\nYour installment of {installment_amount}, due {installment_due_date}, hasn't been received. Please pay this week to keep your plan in place:\n{pay_link}\n\nIf there's a problem, reply and let us know so we can work out a new date.\n\nThank you,\n{signoff}`,
+        sms: `Hi {first_name}, {business_name} hasn't received your installment of {installment_amount}, due {installment_due_date}. Please pay this week: {pay_link} If there's a problem, reply to this message. ${STOP}`,
+      },
     },
   },
 ];
+
+/** Fill in any message a template set doesn't have yet (sets saved before it existed) with the built-in text for its tone. */
+export function withBuiltinFallbacks(content: Partial<TemplateSetContent>, tone: string): TemplateSetContent {
+  const base = (BUILTIN_TONES.find((t) => t.tone === tone) ?? BUILTIN_TONES[0]).templates;
+  return { ...base, ...content };
+}

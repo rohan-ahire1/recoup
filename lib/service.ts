@@ -36,6 +36,7 @@ import {
 } from './repo';
 import {
   INSTALLMENT_INTERVAL_DAYS,
+  MISSED_ATTENTION_AFTER_DAYS,
   PLAN_OFFER_STEP,
   STEPS,
   allocatePayment,
@@ -325,6 +326,7 @@ async function deliver(message: { channel: Channel; toAddr: string | null; subje
 
 function stepLabel(m: Pick<Message, 'step' | 'actionKey'>): string {
   if (m.step) return STEPS.find((s) => s.step === m.step)?.label ?? 'Reminder';
+  if (m.actionKey?.startsWith('installment-missed')) return 'Missed payment follow-up';
   if (m.actionKey?.startsWith('installment')) return 'Payment plan reminder';
   if (m.actionKey?.startsWith('reply-plan')) return 'Payment plan offer';
   return 'Message';
@@ -432,6 +434,17 @@ function openCases(now: number) {
   }
 }
 
+/** A plan payment a week overdue needs the owner: flag it and log it once. */
+function flagMissedInstallment(customerId: number, c: Case, now: number) {
+  const missed = listInstallments(c.id).find((i) => i.seq > 1 && !i.paidAt && now >= i.dueAt + MISSED_ATTENTION_AFTER_DAYS * DAY);
+  if (!missed) return;
+  const reason = `Missed payment ${missed.seq} of the plan`;
+  const detail = `${reason}. It's a week past due.`;
+  if (get('SELECT 1 FROM events WHERE case_id = ? AND type = ? AND detail = ?', c.id, 'installment_missed', detail)) return;
+  updateCase(c.id, { needs_attention: 1, attention_reason: reason }, now);
+  logEvent(customerId, c.id, 'installment_missed', detail, now);
+}
+
 /** Prepare (or send) everything that's due. Safe to call as often as you like. */
 export async function runDueActions(now = getNow()): Promise<RunResult> {
   const settings = getSettings();
@@ -457,6 +470,7 @@ export async function runDueActions(now = getNow()): Promise<RunResult> {
       logEvent(customer.id, c.id, 'unreachable', 'No email or phone to reach them. Reminders stopped.', now);
       continue;
     }
+    if (c.status === 'plan') flagMissedInstallment(customer.id, c, now);
     const plan = planActions({
       status: c.status,
       startedAt: c.startedAt,
@@ -551,8 +565,9 @@ export function refreshDraft(customerId: number, now = getNow()) {
   if (!c || !m) return;
   const customer = getCustomer(customerId)!;
   const channel = pickChannel(customer) ?? (m.channel as Channel);
-  const key: TemplateKey = m.step ? (String(m.step) as TemplateKey) : m.actionKey?.startsWith('installment') ? 'installment' : '4';
-  const installmentId = m.actionKey?.startsWith('installment:') ? Number(m.actionKey.split(':')[1]) : undefined;
+  const missed = m.actionKey?.startsWith('installment-missed:');
+  const key: TemplateKey = m.step ? (String(m.step) as TemplateKey) : missed ? 'installment_missed' : m.actionKey?.startsWith('installment') ? 'installment' : '4';
+  const installmentId = m.actionKey?.startsWith('installment') ? Number(m.actionKey.split(':')[1]) : undefined;
   const tone = toneFor(customer);
   const { subject, body } = renderFor(customer, c, key, channel, tone.set.templates, now, installmentId);
   updateMessage(m.id, { channel, subject, body, tone: tone.set.name, to_addr: channel === 'email' ? customer.email : customer.phone });

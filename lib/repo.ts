@@ -1,5 +1,5 @@
 import { all, get, run } from './db';
-import { BUILTIN_TONES, type TemplateSetContent } from './tones';
+import { BUILTIN_TONES, withBuiltinFallbacks, type TemplateSetContent } from './tones';
 import type {
   Case,
   CaseStatus,
@@ -239,7 +239,7 @@ export interface TemplateSet {
 const toSet = (r: Row): TemplateSet => ({
   ...(r as unknown as TemplateSet),
   builtin: bool(r.builtin),
-  templates: JSON.parse(String(r.templates)),
+  templates: withBuiltinFallbacks(JSON.parse(String(r.templates)), String(r.tone)),
 });
 
 const SET_COLS = 'id, name, tone, description, builtin, templates, created_at AS createdAt';

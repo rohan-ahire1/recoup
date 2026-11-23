@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { allocatePayment, carrierKeyword, pickChannel, planActions, splitInstallments, type EngineInput } from '../lib/sequence';
 import { DAY, HOUR, localParts } from '../lib/time';
@@ -123,6 +126,31 @@ describe('payment plans', () => {
     expect(at(planStart + 13 * DAY, ['installment:12']).actions).toEqual([]);
   });
 
+  it('prepares one missed-payment message once an installment is over 3 days late', () => {
+    const due = planStart + 14 * DAY;
+    expect(at(due + 3 * DAY, ['installment:12']).actions).toEqual([]);
+    const late = at(due + 3 * DAY + HOUR, ['installment:12']);
+    expect(late.actions).toEqual([{ key: 'installment-missed:12', channel: 'email', templateKey: 'installment_missed', installmentId: 12 }]);
+    expect(at(due + 5 * DAY, ['installment:12', 'installment-missed:12']).actions).toEqual([]);
+  });
+
+  it('does not chase an installment that was paid', () => {
+    const paid = installments.map((i) => (i.id === 12 ? { ...i, paidAt: planStart + 15 * DAY } : i));
+    const plan = planActions(input({ now: planStart + 20 * DAY, status: 'plan', installments: paid, sentKeys: new Set(['installment:12']), currentStep: 4 }));
+    expect(plan.actions.map((a) => a.key)).not.toContain('installment-missed:12');
+  });
+
+  it('keeps the minimum gap and quiet hours for missed-payment texts', () => {
+    const sms = { ...customer, preferredChannel: 'sms' as const };
+    const due = planStart + 14 * DAY;
+    const run = (now: number, lastSentAt: number | null) =>
+      planActions(input({ now, status: 'plan', installments, customer: sms, autoSms: true, lastSentAt, sentKeys: new Set(['installment:12']), currentStep: 4 }));
+    expect(run(due + 4 * DAY, due + 3.5 * DAY).actions).toEqual([]);
+    expect(run(due + 4 * DAY, due + 3.5 * DAY).next?.at).toBeGreaterThan(due + 4 * DAY);
+    const night = Date.parse('2026-10-20T04:00:00Z'); // 11pm Chicago
+    expect(planActions(input({ now: night, status: 'plan', installments: [{ id: 12, seq: 2, dueAt: night - 4 * DAY, paidAt: null }], customer: sms, autoSms: true, sentKeys: new Set(['installment:12']) })).actions).toEqual([]);
+  });
+
   it('splits balances exactly', () => {
     expect(splitInstallments(10000, 3)).toEqual([3333, 3333, 3334]);
     expect(splitInstallments(124000, 2)).toEqual([62000, 62000]);
@@ -147,4 +175,59 @@ describe('payments and keywords', () => {
     expect(carrierKeyword('please stop texting me')).toBeNull();
     expect(carrierKeyword('START')).toBe('start');
   });
+});
+
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'recoup-seq-'));
+const { runAsBusiness } = await import('../lib/tenant');
+const accounts = await import('../lib/accounts');
+const svc = await import('../lib/service');
+const repo = await import('../lib/repo');
+const tenant = accounts.tenantOf(accounts.createBusiness({ name: 'Seq Test' }));
+
+describe('missed plan payments in the runner', () => {
+  const T0 = Date.parse('2026-09-01T15:00:00Z');
+  const day = (n: number) => T0 + n * DAY;
+  const date = (n: number) => new Date(day(n)).toISOString().slice(0, 10);
+
+  it('prepares the missed-payment message after 3 days, once, and flags attention at 7', () =>
+    runAsBusiness(tenant, async () => {
+      const csv = ['Customer,Contact,Email,Phone,Invoice,Description,Amount,Due,Paid', `Plan Payer,Pat,pat@x.co,,#9,Work,600,${date(-5)},`].join('\n');
+      await svc.importCsv(csv, day(0));
+      const customerId = repo.findCustomer({ name: 'Plan Payer' })!.id;
+      svc.choosePlan(customerId, 2, day(0)); // payment 2 is due on day 14
+      const first = repo.readyMessageForCase(repo.getOpenCase(customerId)!.id);
+      if (first) svc.markSent(first.id, day(0));
+      const caseOf = () => repo.getOpenCase(customerId)!;
+      const missedKeys = () => repo.listCustomerMessages(customerId).filter((m) => m.actionKey?.startsWith('installment-missed'));
+      const events = () => repo.listEvents(customerId).filter((e) => e.type === 'installment_missed');
+
+      await svc.runDueActions(day(13)); // the day-before reminder
+      const reminder = repo.readyMessageForCase(caseOf().id)!;
+      expect(reminder.actionKey).toMatch(/^installment:/);
+      svc.markSent(reminder.id, day(13));
+
+      await svc.runDueActions(day(17)); // exactly 3 days late: not yet
+      expect(missedKeys()).toHaveLength(0);
+      expect(caseOf().needsAttention).toBe(false);
+
+      await svc.runDueActions(day(18)); // 4 days late
+      const missed = repo.readyMessageForCase(caseOf().id)!;
+      expect(missed.actionKey).toMatch(/^installment-missed:/);
+      expect(missed.body).toContain('$300.00');
+      svc.markSent(missed.id, day(18));
+      await svc.runDueActions(day(19));
+      expect(missedKeys()).toHaveLength(1);
+      expect(caseOf().needsAttention).toBe(false);
+
+      await svc.runDueActions(day(21)); // 7 days late
+      expect(caseOf().needsAttention).toBe(true);
+      expect(caseOf().attentionReason).toBe('Missed payment 2 of the plan');
+      expect(events()).toHaveLength(1);
+
+      // Clearing the flag doesn't bring it back or log it again.
+      repo.updateCase(caseOf().id, { needs_attention: 0, attention_reason: null }, day(21));
+      await svc.runDueActions(day(22));
+      expect(caseOf().needsAttention).toBe(false);
+      expect(events()).toHaveLength(1);
+    }));
 });
