@@ -35,7 +35,7 @@ Personalizing messages from history, writing new template sets from a descriptio
 
 ## Known gaps
 - Mailbox integration (Gmail/Outlook sync) is planned, not built. Replies are logged by hand.
-- Missed plan installments aren't chased yet.
+- Missed plan installments get one polite follow-up after 3 days and are flagged for you after 7. There's no escalation beyond that.
 - No billing yet: every business gets everything.
 - QuickBooks only; Xero and FreshBooks would need their own connectors.
 - One server with SQLite. Fine for hundreds of businesses; Postgres would be needed to run several servers.

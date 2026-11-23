@@ -148,6 +148,6 @@ tests/             Engine, import, history, tenants, email, webhooks, QuickBooks
 ## Known gaps
 
 - Replies are logged by hand; Gmail/Outlook mailbox sync isn't built.
-- Missed plan installments aren't chased yet.
+- Missed plan installments get one polite follow-up after 3 days and are flagged for you after 7. There's no escalation beyond that.
 - QuickBooks is the only accounting integration.
 - One server with SQLite; running several servers would need Postgres.
