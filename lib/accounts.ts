@@ -117,6 +117,10 @@ CREATE TABLE ai_usage (
 ALTER TABLE sessions ADD COLUMN last_seen_at INTEGER;
 CREATE INDEX sessions_business ON sessions(business_id);
 `,
+  `
+-- When the scheduler last started on a business, so the longest-waiting go first.
+ALTER TABLE businesses ADD COLUMN last_run_at INTEGER;
+`,
 ];
 
 const MINUTE = 60_000;
@@ -237,9 +241,17 @@ export function businessesForUser(userId: string): Business[] {
     .map((r) => toBusiness(r)!);
 }
 
-/** Every real (non-demo) business, for the scheduler. */
+/** Every real (non-demo) business, for the scheduler: never run first, then the oldest run. */
 export function listLiveBusinesses(): Business[] {
-  return adb().prepare(`SELECT ${BUSINESS_COLS} FROM businesses b WHERE b.demo = 0 ORDER BY b.created_at`).all().map((r) => toBusiness(r)!);
+  return adb()
+    .prepare(`SELECT ${BUSINESS_COLS} FROM businesses b WHERE b.demo = 0 ORDER BY b.last_run_at IS NOT NULL, b.last_run_at, b.created_at`)
+    .all()
+    .map((r) => toBusiness(r)!);
+}
+
+/** The scheduler started on this business. */
+export function markBusinessRun(id: string, now = Date.now()) {
+  adb().prepare('UPDATE businesses SET last_run_at = ? WHERE id = ?').run(now, id);
 }
 
 export const tenantOf = (b: Business): Tenant => ({ businessId: b.id, demo: b.demo });
