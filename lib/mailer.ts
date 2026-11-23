@@ -1,3 +1,6 @@
+import { appendFileSync, mkdirSync } from 'node:fs';
+import path from 'node:path';
+import { dataDir } from './db';
 import { baseUrl } from './templates';
 
 /** Email from Recoup itself (sign-in links), not from a business. */
@@ -18,6 +21,13 @@ export function loginLink(token: string): string {
 /** Sends a sign-in link. Without email set up (local development) it logs the link instead. */
 export async function sendLoginEmail(to: string, token: string): Promise<{ ok: boolean; devLink?: string }> {
   const link = loginLink(token);
+  if (process.env.E2E_LOG_LOGIN_LINKS === '1') {
+    // Only the Playwright test server sets this: the browser tests read the link from here instead of an inbox.
+    console.log(`Sign-in link for ${to}: ${link}`);
+    mkdirSync(dataDir(), { recursive: true });
+    appendFileSync(path.join(dataDir(), 'e2e-login-links.log'), `${to} ${link}\n`);
+    return { ok: true };
+  }
   if (!platformEmailConfigured()) {
     if (process.env.NODE_ENV === 'production') return { ok: false };
     console.log(`Sign-in link for ${to}: ${link}`);
