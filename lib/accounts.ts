@@ -117,6 +117,20 @@ CREATE TABLE ai_usage (
 ALTER TABLE sessions ADD COLUMN last_seen_at INTEGER;
 CREATE INDEX sessions_business ON sessions(business_id);
 `,
+  `
+-- Invitations to join a business. Only a hash of the emailed token is stored.
+CREATE TABLE invites (
+  token_hash TEXT PRIMARY KEY,
+  business_id TEXT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  email TEXT NOT NULL COLLATE NOCASE,
+  role TEXT NOT NULL,
+  invited_by TEXT REFERENCES users(id) ON DELETE SET NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  accepted_at INTEGER
+);
+CREATE INDEX invites_business ON invites(business_id);
+`,
 ];
 
 const MINUTE = 60_000;
@@ -124,6 +138,7 @@ const DAY = 24 * 60 * MINUTE;
 export const LOGIN_TOKEN_TTL = 15 * MINUTE;
 export const SESSION_TTL = 30 * DAY;
 export const DEMO_TTL = 3 * DAY;
+export const INVITE_TTL = 7 * DAY;
 
 const g = globalThis as unknown as { __recoupAccounts?: DatabaseSync };
 
@@ -242,12 +257,116 @@ export function listLiveBusinesses(): Business[] {
   return adb().prepare(`SELECT ${BUSINESS_COLS} FROM businesses b WHERE b.demo = 0 ORDER BY b.created_at`).all().map((r) => toBusiness(r)!);
 }
 
+export type Role = 'owner' | 'member';
+
+/** The role a user has in a business, or undefined if they aren't part of it. */
+export function roleOf(userId: string, businessId: string): Role | undefined {
+  const r = adb().prepare('SELECT role FROM memberships WHERE user_id = ? AND business_id = ?').get(userId, businessId) as { role: Role } | undefined;
+  return r?.role;
+}
+
 export const tenantOf = (b: Business): Tenant => ({ businessId: b.id, demo: b.demo });
 
 /** Remove a business and all of its data. */
 export function deleteBusiness(id: string) {
   adb().prepare('DELETE FROM businesses WHERE id = ?').run(id);
   deleteBusinessDb(id);
+}
+
+// ---------------------------------------------------------------- team
+
+export interface TeamMember {
+  userId: string;
+  email: string;
+  role: Role;
+}
+
+export interface PendingInvite {
+  email: string;
+  role: Role;
+  expiresAt: number;
+}
+
+export function teamMembers(businessId: string): TeamMember[] {
+  return adb()
+    .prepare(
+      `SELECT u.id AS userId, u.email, m.role FROM memberships m JOIN users u ON u.id = m.user_id
+       WHERE m.business_id = ? ORDER BY m.role = 'owner' DESC, m.created_at`,
+    )
+    .all(businessId) as unknown as TeamMember[];
+}
+
+export function pendingInvites(businessId: string, now = Date.now()): PendingInvite[] {
+  return adb()
+    .prepare(
+      `SELECT email, role, expires_at AS expiresAt FROM invites
+       WHERE business_id = ? AND accepted_at IS NULL AND expires_at > ? ORDER BY created_at`,
+    )
+    .all(businessId, now) as unknown as PendingInvite[];
+}
+
+/** Whether this email already belongs to the business. */
+export function isTeamMember(businessId: string, email: string): boolean {
+  return (
+    adb()
+      .prepare('SELECT 1 FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.business_id = ? AND u.email = ?')
+      .get(businessId, email.trim().toLowerCase()) !== undefined
+  );
+}
+
+/** Invite someone by email. Returns the token to send; inviting the same address again replaces the earlier invite. */
+export function createInvite(opts: { businessId: string; email: string; role: Role; invitedBy: string }, now = Date.now()): string {
+  const token = secret();
+  const email = opts.email.trim().toLowerCase();
+  const d = adb();
+  d.prepare('DELETE FROM invites WHERE business_id = ? AND email = ? AND accepted_at IS NULL').run(opts.businessId, email);
+  d.prepare('INSERT INTO invites (token_hash, business_id, email, role, invited_by, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+    hash(token),
+    opts.businessId,
+    email,
+    opts.role,
+    opts.invitedBy,
+    now,
+    now + INVITE_TTL,
+  );
+  return token;
+}
+
+export function discardInvite(token: string) {
+  adb().prepare('DELETE FROM invites WHERE token_hash = ? AND accepted_at IS NULL').run(hash(token));
+}
+
+/**
+ * Use an invitation, once: finds or creates the user for the invited email and
+ * makes them part of the business. Expired, used or unknown tokens give null.
+ */
+export function acceptInvite(token: string, now = Date.now()): { user: User; business: Business } | null {
+  const d = adb();
+  d.exec('BEGIN');
+  try {
+    const inv = d
+      .prepare(
+        `UPDATE invites SET accepted_at = ? WHERE token_hash = ? AND accepted_at IS NULL AND expires_at > ?
+         RETURNING business_id AS businessId, email, role`,
+      )
+      .get(now, hash(token), now) as { businessId: string; email: string; role: Role } | undefined;
+    const business = inv ? getBusiness(inv.businessId) : undefined;
+    if (!inv || !business) {
+      d.exec('ROLLBACK');
+      return null;
+    }
+    const user = findOrCreateUser(inv.email, now);
+    // Someone already in the business keeps their role, unless this invite makes them an owner.
+    d.prepare(
+      `INSERT INTO memberships (user_id, business_id, role, created_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(user_id, business_id) DO UPDATE SET role = CASE WHEN excluded.role = 'owner' THEN 'owner' ELSE memberships.role END`,
+    ).run(user.id, inv.businessId, inv.role, now);
+    d.exec('COMMIT');
+    return { user, business };
+  } catch (err) {
+    d.exec('ROLLBACK');
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------- sessions
@@ -458,12 +577,13 @@ export function removeExpiredDemos(now = Date.now()): number {
   return demos.length;
 }
 
-/** Drop expired demos, sessions and sign-in links. Returns how many demos went. */
+/** Drop expired demos, sessions, sign-in links and invites. Returns how many demos went. */
 export function cleanUp(now = Date.now()): number {
   const d = adb();
   const demos = removeExpiredDemos(now);
   d.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now);
   d.prepare('DELETE FROM login_tokens WHERE expires_at < ?').run(now - DAY);
+  d.prepare('DELETE FROM invites WHERE expires_at < ?').run(now - DAY);
   d.prepare('DELETE FROM sent_emails WHERE sent_at < ?').run(now - 30 * DAY);
   return demos;
 }
