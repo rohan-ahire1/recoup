@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getBusiness, getSession, SESSION_TTL, tenantOf, type Business, type Session } from './accounts';
+import { getBusiness, getSession, roleOf, SESSION_TTL, tenantOf, type Business, type Role, type Session } from './accounts';
 import type { Tenant } from './tenant';
 
 export const SESSION_COOKIE = 'recoup_session';
@@ -47,4 +47,20 @@ export async function requireBusiness(): Promise<Tenant & { business: Business }
   const business = s.businessId ? getBusiness(s.businessId) : undefined;
   if (!business) redirect(s.userId ? '/welcome' : '/login');
   return { ...tenantOf(business), business };
+}
+
+/** What the session may do in a business. Anonymous demo sessions own their demo; nobody else has a role without a membership. */
+export function roleIn(s: Session, business: Business): Role | undefined {
+  if (!s.userId) return business.demo ? 'owner' : undefined;
+  return roleOf(s.userId, business.id);
+}
+
+/**
+ * Like requireBusiness, for what only an owner may do: delete the business, manage
+ * the team, change email sending or QuickBooks. Members are sent back to Settings.
+ */
+export async function requireOwner(): Promise<Tenant & { business: Business }> {
+  const t = await requireBusiness();
+  if (roleIn(await requireSession(), t.business) !== 'owner') redirect('/settings?error=owner');
+  return t;
 }

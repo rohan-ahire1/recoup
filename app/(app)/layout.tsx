@@ -1,10 +1,12 @@
 import Link from 'next/link';
+import { BusinessSwitcher } from '@/app/components/BusinessSwitcher';
 import { DemoStrip } from '@/app/components/DemoStrip';
 import { Icon } from '@/app/components/icons';
 import { NavLinks } from '@/app/components/NavLinks';
 import { StickyBar } from '@/app/components/StickyBar';
 import { buttonClass } from '@/app/components/ui';
-import { requireBusiness } from '@/lib/auth';
+import { businessesForUser } from '@/lib/accounts';
+import { currentSession, requireBusiness } from '@/lib/auth';
 import { initials } from '@/lib/format';
 import { isDemoMode } from '@/lib/providers';
 import { listMessagesByStatus } from '@/lib/repo';
@@ -14,7 +16,9 @@ import { enterBusiness } from '@/lib/tenant';
 export const dynamic = 'force-dynamic';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { demo } = enterBusiness(await requireBusiness());
+  const { demo, businessId } = enterBusiness(await requireBusiness());
+  const userId = (await currentSession())?.userId;
+  const mine = userId ? businessesForUser(userId).filter((b) => !b.demo) : [];
   const { businessName, showDemoBar } = getSettings();
   const toSend = listMessagesByStatus(['ready']).length;
   return (
@@ -33,6 +37,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 Use it for my business
               </Link>
             )}
+            {mine.length > 1 && <BusinessSwitcher businesses={mine} currentId={businessId} />}
             <Link href="/settings" aria-label="Settings" className="ease flex h-10 w-10 items-center justify-center rounded-full text-muted hover:bg-linen hover:text-ink">
               <Icon name="gear" />
             </Link>
