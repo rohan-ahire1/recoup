@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { renameBusiness } from '@/lib/accounts';
 import { AiLimitError } from '@/lib/ai';
-import { requireBusiness } from '@/lib/auth';
+import { requireBusiness, requireOwner, requireSession, roleIn } from '@/lib/auth';
 import { normalizeEmail, normalizePhone, parseAmount } from '@/lib/csv';
 import { addOwnDomain, checkOwnDomain, removeOwnDomain } from '@/lib/email';
 import { disconnectQuickBooks, syncQuickBooks } from '@/lib/quickbooks';
@@ -266,7 +266,9 @@ export async function setDefaultTemplateAction(form: FormData) {
 // ---------------------------------------------------------------- settings & views
 
 export async function saveSettingsAction(form: FormData) {
-  const { businessId } = enterBusiness(await requireBusiness());
+  const { businessId, business } = enterBusiness(await requireBusiness());
+  // How reminders are sent (and the address they carry) is the owner's call.
+  const owner = roleIn(await requireSession(), business) === 'owner';
   const current = getSettings();
   const timezone = str(form, 'timezone') || current.timezone;
   try {
@@ -276,17 +278,19 @@ export async function saveSettingsAction(form: FormData) {
   }
   const businessName = str(form, 'businessName') || current.businessName;
   // Automatic email carries the business's postal address, as the law for commercial email expects.
-  const needsAddress = str(form, 'deliveryMode') === 'auto' && !str(form, 'mailingAddress');
+  const mailingAddress = owner ? str(form, 'mailingAddress').slice(0, 300) : current.mailingAddress;
+  const deliveryMode = owner ? (str(form, 'deliveryMode') as DeliveryMode) : current.deliveryMode;
+  const needsAddress = owner && deliveryMode === 'auto' && !mailingAddress;
   renameBusiness(businessId, businessName);
   saveSettings({
     businessName,
     senderName: str(form, 'senderName'),
     timezone,
     replyToEmail: str(form, 'replyToEmail'),
-    mailingAddress: str(form, 'mailingAddress').slice(0, 300),
+    mailingAddress,
     payInstructions: str(form, 'payInstructions').slice(0, 2000),
     payLink: cleanPayLink(str(form, 'payLink')),
-    deliveryMode: (str(form, 'deliveryMode') as DeliveryMode) === 'auto' && !needsAddress ? 'auto' : 'prepare',
+    deliveryMode: !owner ? current.deliveryMode : deliveryMode === 'auto' && !needsAddress ? 'auto' : 'prepare',
   });
   refresh();
   redirect(needsAddress ? '/settings?error=address' : '/settings?saved=1');
@@ -295,7 +299,7 @@ export async function saveSettingsAction(form: FormData) {
 // ---------------------------------------------------------------- QuickBooks
 
 export async function syncQuickBooksAction() {
-  enterBusiness(await requireBusiness());
+  enterBusiness(await requireOwner());
   let result = 'synced';
   try {
     await syncQuickBooks();
@@ -307,7 +311,7 @@ export async function syncQuickBooksAction() {
 }
 
 export async function disconnectQuickBooksAction() {
-  const { businessId } = enterBusiness(await requireBusiness());
+  const { businessId } = enterBusiness(await requireOwner());
   await disconnectQuickBooks(businessId);
   refresh();
   redirect('/settings?qb=removed#quickbooks');
@@ -316,7 +320,7 @@ export async function disconnectQuickBooksAction() {
 // ---------------------------------------------------------------- own email domain
 
 export async function addEmailDomainAction(form: FormData) {
-  const { businessId } = enterBusiness(await requireBusiness());
+  const { businessId } = enterBusiness(await requireOwner());
   if (isDemoMode()) redirect('/settings');
   const from = normalizeEmail(str(form, 'fromEmail'));
   const error = from ? await addOwnDomain(businessId, from) : 'That doesn’t look like an email address.';
@@ -325,14 +329,14 @@ export async function addEmailDomainAction(form: FormData) {
 }
 
 export async function checkEmailDomainAction() {
-  const { businessId } = enterBusiness(await requireBusiness());
+  const { businessId } = enterBusiness(await requireOwner());
   await checkOwnDomain(businessId);
   refresh();
   redirect('/settings?checked=1#email');
 }
 
 export async function removeEmailDomainAction() {
-  const { businessId } = enterBusiness(await requireBusiness());
+  const { businessId } = enterBusiness(await requireOwner());
   await removeOwnDomain(businessId);
   refresh();
   redirect('/settings#email');

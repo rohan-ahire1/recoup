@@ -1,7 +1,20 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// The signed-in cookie and redirects, standing in for Next's request context.
+const req = vi.hoisted(() => ({ token: '' as string | undefined }));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: (name: string) => (name === 'recoup_session' && req.token ? { value: req.token } : undefined), set: () => {}, delete: () => {} }),
+  headers: async () => new Headers(),
+}));
+vi.mock('next/navigation', () => ({
+  redirect: (url: string) => {
+    throw new Error(`REDIRECT ${url}`);
+  },
+}));
+vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'recoup-accounts-'));
 
@@ -150,5 +163,100 @@ describe('deleting a business', () => {
     expect(a.getBusiness(b.id)).toBeUndefined();
     expect(a.businessForPayToken(token)).toBeUndefined();
     expect(fs.existsSync(businessDbFile(b.id))).toBe(false);
+  });
+});
+
+describe('team invites', () => {
+  const setup = (name: string) => {
+    const owner = a.findOrCreateUser(`${name}-owner@example.com`, T0);
+    const business = a.createBusiness({ name, ownerId: owner.id }, T0);
+    return { owner, business };
+  };
+
+  it('creates an invite that is stored hashed and expires in 7 days', () => {
+    const { owner, business } = setup('Invite Create');
+    const token = a.createInvite({ businessId: business.id, email: ' Bo@Example.com ', role: 'member', invitedBy: owner.id }, T0);
+    expect(a.pendingInvites(business.id, T0)).toEqual([{ email: 'bo@example.com', role: 'member', expiresAt: T0 + a.INVITE_TTL }]);
+    expect(a.INVITE_TTL).toBe(7 * 86_400_000);
+    // Re-inviting the same address replaces the earlier invite.
+    a.createInvite({ businessId: business.id, email: 'BO@example.com', role: 'owner', invitedBy: owner.id }, T0 + 1000);
+    expect(a.pendingInvites(business.id, T0 + 1000)).toHaveLength(1);
+    expect(a.acceptInvite(token, T0 + 2000)).toBeNull();
+    a.deleteBusiness(business.id);
+  });
+
+  it('accepting adds the membership, creating the user if needed', () => {
+    const { owner, business } = setup('Invite Accept');
+    const token = a.createInvite({ businessId: business.id, email: 'new@example.com', role: 'member', invitedBy: owner.id }, T0);
+    const joined = a.acceptInvite(token, T0 + 1000)!;
+    expect(joined.business.id).toBe(business.id);
+    expect(joined.user.email).toBe('new@example.com');
+    expect(a.roleOf(joined.user.id, business.id)).toBe('member');
+    expect(a.businessesForUser(joined.user.id).map((b) => b.id)).toEqual([business.id]);
+    expect(a.teamMembers(business.id).map((m) => m.email)).toEqual([owner.email, 'new@example.com']);
+    expect(a.pendingInvites(business.id, T0 + 2000)).toEqual([]);
+    a.deleteBusiness(business.id);
+  });
+
+  it('keeps an existing owner an owner when they accept a member invite', () => {
+    const { owner, business } = setup('Invite Keep');
+    const token = a.createInvite({ businessId: business.id, email: owner.email, role: 'member', invitedBy: owner.id }, T0);
+    a.acceptInvite(token, T0 + 1000);
+    expect(a.roleOf(owner.id, business.id)).toBe('owner');
+    a.deleteBusiness(business.id);
+  });
+
+  it('expires after 7 days', () => {
+    const { owner, business } = setup('Invite Expiry');
+    const token = a.createInvite({ businessId: business.id, email: 'late@example.com', role: 'member', invitedBy: owner.id }, T0);
+    expect(a.acceptInvite(token, T0 + a.INVITE_TTL + 1)).toBeNull();
+    expect(a.pendingInvites(business.id, T0 + a.INVITE_TTL + 1)).toEqual([]);
+    a.deleteBusiness(business.id);
+  });
+
+  it('works once', () => {
+    const { owner, business } = setup('Invite Once');
+    const token = a.createInvite({ businessId: business.id, email: 'once@example.com', role: 'member', invitedBy: owner.id }, T0);
+    expect(a.acceptInvite(token, T0 + 1000)).toBeTruthy();
+    expect(a.acceptInvite(token, T0 + 2000)).toBeNull();
+    expect(a.acceptInvite('made-up', T0)).toBeNull();
+    a.deleteBusiness(business.id);
+  });
+
+  it('a member can’t delete the business or touch sending, but an owner can', async () => {
+    const { owner, business } = setup('Invite Roles');
+    const token = a.createInvite({ businessId: business.id, email: 'mem@example.com', role: 'member', invitedBy: owner.id }, T0);
+    const member = a.acceptInvite(token, T0 + 1000)!.user;
+    const actions = await import('../app/account-actions');
+    const form = new FormData();
+    form.set('confirm', 'Invite Roles');
+
+    req.token = a.createSession({ userId: member.id, businessId: business.id });
+    await expect(actions.deleteBusinessAction(form)).rejects.toThrow('REDIRECT /settings?error=owner');
+    await expect(actions.inviteTeammateAction(new FormData())).rejects.toThrow('REDIRECT /settings?error=owner');
+    expect(a.getBusiness(business.id)).toBeTruthy();
+
+    req.token = a.createSession({ userId: owner.id, businessId: business.id });
+    await expect(actions.deleteBusinessAction(form)).rejects.toThrow('REDIRECT /?deleted=1');
+    expect(a.getBusiness(business.id)).toBeUndefined();
+  });
+
+  it('only lets people switch to businesses they belong to', async () => {
+    const one = setup('Switch One');
+    const two = setup('Switch Two');
+    const actions = await import('../app/account-actions');
+    const form = new FormData();
+    form.set('businessId', two.business.id);
+    const session = a.createSession({ userId: one.owner.id, businessId: one.business.id });
+    req.token = session;
+    await expect(actions.switchBusinessAction(form)).rejects.toThrow('REDIRECT /');
+    expect(a.getSession(session)?.businessId).toBe(one.business.id);
+
+    const token = a.createInvite({ businessId: two.business.id, email: one.owner.email, role: 'member', invitedBy: two.owner.id }, T0);
+    a.acceptInvite(token, T0 + 1000);
+    await expect(actions.switchBusinessAction(form)).rejects.toThrow('REDIRECT /');
+    expect(a.getSession(session)?.businessId).toBe(two.business.id);
+    a.deleteBusiness(one.business.id);
+    a.deleteBusiness(two.business.id);
   });
 });

@@ -1,4 +1,4 @@
-import { deleteBusinessAction, signOutAction } from '@/app/account-actions';
+import { deleteBusinessAction, inviteTeammateAction, signOutAction } from '@/app/account-actions';
 import {
   addEmailDomainAction,
   checkEmailDomainAction,
@@ -11,11 +11,11 @@ import {
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { buttonClass, Chip, FIELD, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
 import { aiEnabled, aiUsage } from '@/lib/ai';
-import { getEmailDomain, getQuickBooks, getUser } from '@/lib/accounts';
+import { getEmailDomain, getQuickBooks, getUser, pendingInvites, teamMembers } from '@/lib/accounts';
 import { dailyCap, dailyLimit, senderFor } from '@/lib/email';
 import { formatDate, relativeTime } from '@/lib/format';
 import { quickBooksConfigured } from '@/lib/quickbooks';
-import { requireBusiness, requireSession } from '@/lib/auth';
+import { requireBusiness, requireSession, roleIn } from '@/lib/auth';
 import { isDemoMode, providerStatus } from '@/lib/providers';
 import { getSettings } from '@/lib/settings';
 import { enterBusiness } from '@/lib/tenant';
@@ -32,6 +32,13 @@ const QB_NOTICES: Record<string, { tone: 'teal' | 'rust'; text: string }> = {
   cancelled: { tone: 'rust', text: 'QuickBooks wasn’t connected.' },
   disconnected: { tone: 'rust', text: 'Recoup was disconnected from QuickBooks. Connect again to keep invoices in sync.' },
   removed: { tone: 'teal', text: 'QuickBooks is disconnected. Invoices already here stay.' },
+};
+
+const TEAM_NOTICES: Record<string, { tone: 'teal' | 'rust'; text: string }> = {
+  email: { tone: 'rust', text: 'That doesn’t look like an email address.' },
+  member: { tone: 'rust', text: 'That person is already on the team.' },
+  slow: { tone: 'rust', text: 'You’ve sent a lot of invites. Please wait a bit and try again.' },
+  send: { tone: 'rust', text: 'We couldn’t send the invite just now. Please try again in a minute.' },
 };
 
 function Connection({ id, name, detail, status }: { id?: string; name: string; detail: React.ReactNode; status: React.ReactNode }) {
@@ -51,12 +58,16 @@ const connected = <span className="rounded-full bg-teal-soft px-3 py-1 text-sm f
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; error?: string; domainError?: string; checked?: string; qb?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; domainError?: string; checked?: string; qb?: string; team?: string; to?: string; dev?: string }>;
 }) {
   const { business } = enterBusiness(await requireBusiness());
   const session = await requireSession();
   const user = session.userId ? getUser(session.userId) : undefined;
-  const { saved, error, domainError, checked, qb } = await searchParams;
+  const { saved, error, domainError, checked, qb, team, to, dev } = await searchParams;
+  const owner = roleIn(session, business) === 'owner';
+  const members = user && !business.demo ? teamMembers(business.id) : [];
+  const invites = members.length ? pendingInvites(business.id) : [];
+  const teamNotice = team ? TEAM_NOTICES[team] : undefined;
   const s = getSettings();
   const p = providerStatus();
   const canAuto = p.email !== 'mock';
@@ -79,6 +90,7 @@ export default async function SettingsPage({
   );
   let qbStatus: React.ReactNode;
   if (business.demo) qbStatus = <Chip tone="outline">Off in the demo</Chip>;
+  else if (!owner) qbStatus = <Chip tone="outline">{qbo ? 'Owner only' : 'Not connected'}</Chip>;
   else if (!quickBooksConfigured()) qbStatus = <Chip tone="outline">Not set up yet</Chip>;
   else if (!qbo || qbo.lastError === 'disconnected') qbStatus = connectQb;
   else
@@ -106,6 +118,7 @@ export default async function SettingsPage({
   return (
     <div className="mx-auto max-w-3xl">
       <PageTitle title="Settings" />
+      {error === 'owner' && <p className="mb-4 rounded-block bg-rust-soft px-4 py-3 text-sm font-semibold text-rust">Only an owner can do that.</p>}
       <form action={saveSettingsAction} className="flex flex-col gap-6">
         <Panel className="grid gap-4 p-6 text-sm font-semibold sm:grid-cols-2 sm:p-7">
           <h2 className="display text-section font-bold sm:col-span-2">Your business</h2>
@@ -134,7 +147,7 @@ export default async function SettingsPage({
           </label>
           <label className="sm:col-span-2">
             Mailing address
-            <input name="mailingAddress" defaultValue={s.mailingAddress} maxLength={300} placeholder="12 Main St, Springfield, IL 62701" className={field} />
+            <input name="mailingAddress" defaultValue={s.mailingAddress} maxLength={300} disabled={!owner} placeholder="12 Main St, Springfield, IL 62701" className={field} />
             <span className="mt-1 block font-normal text-faint">Printed at the bottom of emails Recoup sends for you. Needed for sending automatically.</span>
           </label>
         </Panel>
@@ -164,6 +177,7 @@ export default async function SettingsPage({
 
         <Panel className="flex flex-col gap-3 p-6 sm:p-7">
           <h2 className="display text-section font-bold">Sending</h2>
+          {!owner && <p className="text-sm text-muted">Only an owner can change how reminders are sent.</p>}
           {error === 'address' && <p className="text-sm font-semibold text-rust">Add your mailing address above to send automatically.</p>}
           {business.emailPausedAt && (
             <p className="rounded-block bg-rust-soft px-4 py-3 text-sm text-rust">
@@ -174,8 +188,8 @@ export default async function SettingsPage({
             { v: 'prepare', title: 'I’ll send them myself', detail: 'Recoup drafts each reminder. You open it in Gmail, Outlook, your mail app or your phone, and press send.' },
             { v: 'auto', title: 'Send automatically', detail: canAuto ? `Emails go out on their own, up to ${limit.cap} a day. Texts still open on your phone for you to send.` : 'Email sending isn’t set up on this server yet.' },
           ].map((o) => (
-            <label key={o.v} className={`ease flex gap-3 rounded-block px-4 py-3.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal ${o.v === 'auto' && !canAuto ? 'opacity-60' : 'cursor-pointer'}`}>
-              <input type="radio" name="deliveryMode" value={o.v} defaultChecked={s.deliveryMode === o.v} disabled={o.v === 'auto' && !canAuto} className="mt-1 accent-teal" />
+            <label key={o.v} className={`ease flex gap-3 rounded-block px-4 py-3.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal ${!owner || (o.v === 'auto' && !canAuto) ? 'opacity-60' : 'cursor-pointer'}`}>
+              <input type="radio" name="deliveryMode" value={o.v} defaultChecked={s.deliveryMode === o.v} disabled={!owner || (o.v === 'auto' && !canAuto)} className="mt-1 accent-teal" />
               <span>
                 <span className="font-semibold">{o.title}</span>
                 <span className="block text-sm text-muted">{o.detail}</span>
@@ -190,7 +204,7 @@ export default async function SettingsPage({
         </div>
       </form>
 
-      {canAuto && (
+      {canAuto && owner && (
         <Panel id="email" className="mt-8 flex scroll-mt-24 flex-col gap-4 p-6 text-sm sm:p-7">
           <div>
             <h2 className="display text-section font-bold">Email address</h2>
@@ -282,6 +296,46 @@ export default async function SettingsPage({
         </Panel>
       )}
 
+      {user && !business.demo && (
+        <Panel id="team" className="mt-8 flex scroll-mt-24 flex-col gap-4 p-6 text-sm sm:p-7">
+          <div>
+            <h2 className="display text-section font-bold">Team</h2>
+            <p className="text-muted">Owners can manage the team, sending and QuickBooks, and delete the business. Members can do everything else.</p>
+          </div>
+          {teamNotice && <p className={`font-semibold ${teamNotice.tone === 'teal' ? 'text-teal' : 'text-rust'}`}>{teamNotice.text}</p>}
+          {team === 'sent' && to && <p className="font-semibold text-teal">Invite sent to {to}. It works once and expires in 7 days.</p>}
+          {team === 'sent' && dev && (
+            <p className="rounded-block bg-linen px-4 py-3 break-all">
+              Email isn’t set up on this server, so here’s the link: <a className="font-semibold text-teal underline" href={dev}>accept the invite</a>
+            </p>
+          )}
+          <ul className="divide-y divide-linen">
+            {members.map((m) => (
+              <li key={m.userId} className="flex items-center justify-between gap-3 py-3">
+                <span className="min-w-0 break-all">{m.email}</span>
+                <Chip tone="outline">{m.role === 'owner' ? 'Owner' : 'Member'}</Chip>
+              </li>
+            ))}
+            {invites.map((i) => (
+              <li key={i.email} className="flex items-center justify-between gap-3 py-3">
+                <span className="min-w-0 break-all text-muted">{i.email}</span>
+                <Chip tone="outline">Invited · {i.role === 'owner' ? 'owner' : 'member'} · until {formatDate(i.expiresAt, s.timezone)}</Chip>
+              </li>
+            ))}
+          </ul>
+          {owner && (
+            <form action={inviteTeammateAction} className="flex flex-wrap gap-2 border-t border-linen pt-4">
+              <input name="email" type="email" required placeholder="bookkeeper@example.com" aria-label="Email to invite" className={`h-11 max-w-xs ${FIELD}`} />
+              <select name="role" defaultValue="member" aria-label="Role" className={`h-11 w-auto ${FIELD}`}>
+                <option value="member">Member</option>
+                <option value="owner">Owner</option>
+              </select>
+              <SubmitButton variant="outline" pendingLabel="Sending…">Invite</SubmitButton>
+            </form>
+          )}
+        </Panel>
+      )}
+
       <Panel className="mt-8 p-6 sm:p-7">
         <h2 className="display text-section font-bold">Connections</h2>
         <p className="text-sm text-muted">Everything works without them.</p>
@@ -304,7 +358,7 @@ export default async function SettingsPage({
             <SubmitButton variant="outline" pendingLabel="Signing out…">{user ? 'Sign out' : 'Leave the demo'}</SubmitButton>
           </form>
         </div>
-        {!business.demo && (
+        {!business.demo && owner && (
           <form action={deleteBusinessAction} className="flex flex-col gap-3 border-t border-linen pt-5 text-sm">
             <span className="font-semibold">Delete {business.name}</span>
             <span className="text-muted">Removes every customer, invoice, message and setting for good. Download your invoices first if you need them.</span>

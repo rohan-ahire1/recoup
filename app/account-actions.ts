@@ -3,26 +3,32 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import {
+  acceptInvite,
   businessesForUser,
   consumeLoginToken,
   createBusiness,
   createLoginToken,
+  createInvite,
   createSession,
   deleteBusiness,
   deleteSession,
+  discardInvite,
   findOrCreateUser,
+  getUser,
+  isTeamMember,
   makeRoomForDemo,
   maxLiveDemos,
   renameBusiness,
+  roleOf,
   setSessionBusiness,
   tenantOf,
 } from '@/lib/accounts';
 import { alert } from '@/lib/alert';
-import { clearSessionCookie, currentSession, requireBusiness, requireSession, setSessionCookie } from '@/lib/auth';
+import { clearSessionCookie, currentSession, requireOwner, requireSession, setSessionCookie } from '@/lib/auth';
 import { normalizeEmail } from '@/lib/csv';
 import { removeOwnDomain } from '@/lib/email';
 import { disconnectQuickBooks } from '@/lib/quickbooks';
-import { sendLoginEmail } from '@/lib/mailer';
+import { sendInviteEmail, sendLoginEmail } from '@/lib/mailer';
 import { allow } from '@/lib/rate-limit';
 import { saveSettings } from '@/lib/settings';
 import { enterBusiness, runAsBusiness } from '@/lib/tenant';
@@ -88,7 +94,8 @@ export async function createBusinessAction(form: FormData) {
   if (!s.userId) redirect('/login');
   const name = str(form, 'businessName');
   if (!name) redirect('/welcome?error=name');
-  const existing = businessesForUser(s.userId).find((b) => !b.demo);
+  // Only a business this person owns is set up here; a team member shouldn't rename someone else's.
+  const existing = businessesForUser(s.userId).find((b) => !b.demo && roleOf(s.userId!, b.id) === 'owner');
   const business = existing ?? createBusiness({ name, ownerId: s.userId });
   if (existing) renameBusiness(existing.id, name);
 
@@ -106,7 +113,7 @@ export async function createBusinessAction(form: FormData) {
 }
 
 export async function deleteBusinessAction(form: FormData) {
-  const { business } = enterBusiness(await requireBusiness());
+  const { business } = enterBusiness(await requireOwner());
   if (str(form, 'confirm').toLowerCase() !== business.name.toLowerCase()) redirect('/settings?error=confirm');
   await removeOwnDomain(business.id);
   await disconnectQuickBooks(business.id);
@@ -115,6 +122,50 @@ export async function deleteBusinessAction(form: FormData) {
   if (s) deleteSession(s.token);
   await clearSessionCookie();
   redirect('/?deleted=1');
+}
+
+// ---------------------------------------------------------------- team
+
+/** Switch the session to another business the person belongs to. */
+export async function switchBusinessAction(form: FormData) {
+  const s = await requireSession();
+  const id = str(form, 'businessId');
+  if (!s.userId || !roleOf(s.userId, id)) redirect('/');
+  setSessionBusiness(s.token, id);
+  redirect('/');
+}
+
+export async function inviteTeammateAction(form: FormData) {
+  const { business } = enterBusiness(await requireOwner());
+  const s = await requireSession();
+  const inviter = s.userId ? getUser(s.userId) : undefined;
+  if (business.demo || !inviter) redirect('/settings');
+  const email = normalizeEmail(str(form, 'email'));
+  if (!email) redirect('/settings?team=email#team');
+  const role = str(form, 'role') === 'owner' ? 'owner' : 'member';
+  if (isTeamMember(business.id, email)) redirect('/settings?team=member#team');
+  if (!allow(`invite:business:${business.id}`, 10, 60 * MINUTE)) redirect('/settings?team=slow#team');
+
+  const token = createInvite({ businessId: business.id, email, role, invitedBy: inviter.id });
+  const sent = await sendInviteEmail(email, token, { businessName: business.name, inviterEmail: inviter.email });
+  if (!sent.ok) {
+    discardInvite(token);
+    redirect('/settings?team=send#team');
+  }
+  const q = new URLSearchParams({ team: 'sent', to: email });
+  if (sent.devLink) q.set('dev', sent.devLink);
+  redirect(`/settings?${q}#team`);
+}
+
+/** A button press, not a link visit: mail scanners open links and would use them up. */
+export async function acceptInviteAction(form: FormData) {
+  const joined = acceptInvite(str(form, 'token'));
+  if (!joined) redirect('/invite/verify?error=expired');
+
+  const old = await currentSession();
+  if (old) deleteSession(old.token);
+  await setSessionCookie(createSession({ userId: joined.user.id, businessId: joined.business.id }));
+  redirect('/');
 }
 
 // ---------------------------------------------------------------- demo

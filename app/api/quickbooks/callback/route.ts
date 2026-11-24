@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { requireBusiness } from '@/lib/auth';
+import { requireOwner } from '@/lib/auth';
 import { connectQuickBooks, STATE_COOKIE, syncQuickBooks } from '@/lib/quickbooks';
 import { baseUrl } from '@/lib/templates';
 import { runAsBusiness } from '@/lib/tenant';
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /** Intuit sends the business back here after they approve (or cancel) the connection. */
 export async function GET(req: Request) {
-  const tenant = await requireBusiness();
+  const tenant = await requireOwner();
   const q = new URL(req.url).searchParams;
   const jar = await cookies();
   const expected = jar.get(STATE_COOKIE)?.value;
