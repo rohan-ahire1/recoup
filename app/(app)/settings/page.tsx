@@ -304,10 +304,17 @@ export default async function SettingsPage({
             <SubmitButton variant="outline" pendingLabel="Signing out…">{user ? 'Sign out' : 'Leave the demo'}</SubmitButton>
           </form>
         </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-linen pt-5 text-sm">
+          <span className="min-w-0">
+            <span className="block font-semibold">Your data</span>
+            <span className="text-muted">Every customer, invoice, message, payment and setting, in one file.</span>
+          </span>
+          <a href="/api/export/all" download className={buttonClass('outline')}>Download all your data</a>
+        </div>
         {!business.demo && (
           <form action={deleteBusinessAction} className="flex flex-col gap-3 border-t border-linen pt-5 text-sm">
             <span className="font-semibold">Delete {business.name}</span>
-            <span className="text-muted">Removes every customer, invoice, message and setting for good. Download your invoices first if you need them.</span>
+            <span className="text-muted">Removes every customer, invoice, message and setting for good. Download your data first if you need it.</span>
             {error === 'confirm' && <span className="font-semibold text-rust">Type the business name exactly to confirm.</span>}
             <div className="flex flex-wrap gap-2">
               <input name="confirm" placeholder={`Type “${business.name}” to confirm`} aria-label="Business name to confirm" className={`h-11 max-w-xs ${FIELD}`} />
