@@ -15,6 +15,10 @@ export function loginLink(token: string): string {
   return `${baseUrl()}/login/verify?token=${encodeURIComponent(token)}`;
 }
 
+export function emailChangeLink(token: string): string {
+  return `${baseUrl()}/account/confirm-email?token=${encodeURIComponent(token)}`;
+}
+
 /** Sends a sign-in link. Without email set up (local development) it logs the link instead. */
 export async function sendLoginEmail(to: string, token: string): Promise<{ ok: boolean; devLink?: string }> {
   const link = loginLink(token);
@@ -44,6 +48,39 @@ export async function sendLoginEmail(to: string, token: string): Promise<{ ok: b
     return { ok: res.ok };
   } catch (err) {
     console.error('Sign-in email failed', err);
+    return { ok: false };
+  }
+}
+
+/** Sends the link that confirms a new sign-in address. Without email set up (local development) it logs the link instead. */
+export async function sendEmailChangeEmail(to: string, token: string): Promise<{ ok: boolean; devLink?: string }> {
+  const link = emailChangeLink(token);
+  if (!platformEmailConfigured()) {
+    if (process.env.NODE_ENV === 'production') return { ok: false };
+    console.log(`Email-change link for ${to}: ${link}`);
+    return { ok: true, devLink: link };
+  }
+  const text = [
+    'Someone asked to use this address to sign in to Recoup. To confirm, open this link and press the button:',
+    '',
+    link,
+    '',
+    'It works once and expires in 15 minutes. If you didn’t ask for it, you can ignore this email and nothing changes.',
+    '',
+    '--',
+    `Privacy: ${baseUrl()}/privacy`,
+    `Terms: ${baseUrl()}/terms`,
+  ].join('\n');
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: platformFrom(), to: [to], subject: 'Confirm your new Recoup email', text }),
+    });
+    if (!res.ok) console.error('Email-change email failed', res.status, await res.text());
+    return { ok: res.ok };
+  } catch (err) {
+    console.error('Email-change email failed', err);
     return { ok: false };
   }
 }
