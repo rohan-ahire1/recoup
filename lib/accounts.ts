@@ -117,6 +117,12 @@ CREATE TABLE ai_usage (
 ALTER TABLE sessions ADD COLUMN last_seen_at INTEGER;
 CREATE INDEX sessions_business ON sessions(business_id);
 `,
+  `
+-- Email links of another kind: 'email_change' confirms a new sign-in address for user_id.
+-- Sign-in only accepts purpose 'login'.
+ALTER TABLE login_tokens ADD COLUMN purpose TEXT NOT NULL DEFAULT 'login';
+ALTER TABLE login_tokens ADD COLUMN user_id TEXT REFERENCES users(id) ON DELETE CASCADE;
+`,
 ];
 
 const MINUTE = 60_000;
@@ -159,8 +165,27 @@ export function createLoginToken(email: string, now = Date.now()): string {
 /** The email a sign-in link was for, once. Expired or used links give null. */
 export function consumeLoginToken(token: string, now = Date.now()): string | null {
   const r = adb()
-    .prepare('UPDATE login_tokens SET used_at = ? WHERE token_hash = ? AND used_at IS NULL AND expires_at > ? RETURNING email')
+    .prepare("UPDATE login_tokens SET used_at = ? WHERE token_hash = ? AND purpose = 'login' AND used_at IS NULL AND expires_at > ? RETURNING email")
     .get(now, hash(token), now) as { email: string } | undefined;
+  return r?.email ?? null;
+}
+
+/** A link to confirm a new sign-in address for this user. */
+export function createEmailChangeToken(userId: string, newEmail: string, now = Date.now()): string {
+  const token = secret();
+  adb()
+    .prepare("INSERT INTO login_tokens (token_hash, email, created_at, expires_at, purpose, user_id) VALUES (?, ?, ?, ?, 'email_change', ?)")
+    .run(hash(token), newEmail.trim().toLowerCase(), now, now + LOGIN_TOKEN_TTL, userId);
+  return token;
+}
+
+/** The new address an email-change link was for, once, and only for the user it was made for. */
+export function consumeEmailChangeToken(token: string, userId: string, now = Date.now()): string | null {
+  const r = adb()
+    .prepare(
+      "UPDATE login_tokens SET used_at = ? WHERE token_hash = ? AND purpose = 'email_change' AND user_id = ? AND used_at IS NULL AND expires_at > ? RETURNING email",
+    )
+    .get(now, hash(token), userId, now) as { email: string } | undefined;
   return r?.email ?? null;
 }
 
@@ -181,6 +206,24 @@ export function findOrCreateUser(email: string, now = Date.now()): User {
 
 export function getUser(id: string): User | undefined {
   return adb().prepare('SELECT id, email FROM users WHERE id = ?').get(id) as User | undefined;
+}
+
+/** Whether a different user already signs in with this email. */
+export function emailTakenByOther(email: string, userId: string): boolean {
+  return Boolean(adb().prepare('SELECT 1 FROM users WHERE email = ? AND id <> ?').get(email.trim().toLowerCase(), userId));
+}
+
+/** Changes a user's sign-in email. 'taken' if another user has it. */
+export function changeUserEmail(userId: string, newEmail: string): 'ok' | 'taken' | 'missing' {
+  const clean = newEmail.trim().toLowerCase();
+  if (!getUser(userId)) return 'missing';
+  if (emailTakenByOther(clean, userId)) return 'taken';
+  try {
+    adb().prepare('UPDATE users SET email = ? WHERE id = ?').run(clean, userId);
+  } catch {
+    return 'taken';
+  }
+  return 'ok';
 }
 
 // ---------------------------------------------------------------- businesses
@@ -291,6 +334,39 @@ export function setSessionBusiness(token: string, businessId: string) {
 
 export function deleteSession(token: string) {
   adb().prepare('DELETE FROM sessions WHERE token_hash = ?').run(hash(token));
+}
+
+/** Ends every session this user has, on every device. Returns how many. */
+export function deleteSessionsForUser(userId: string): number {
+  return Number(adb().prepare('DELETE FROM sessions WHERE user_id = ?').run(userId).changes);
+}
+
+// ---------------------------------------------------------------- deleting an account
+
+/**
+ * What deleting this user's account would remove: businesses where they're the
+ * only owner go entirely; businesses with another owner just lose this member.
+ */
+export function accountDeletionPlan(userId: string): { remove: Business[]; leave: Business[] } {
+  const rows = adb()
+    .prepare(
+      `SELECT ${BUSINESS_COLS},
+         EXISTS (SELECT 1 FROM memberships o WHERE o.business_id = b.id AND o.user_id <> m.user_id AND o.role = 'owner') AS shared
+       FROM businesses b JOIN memberships m ON m.business_id = b.id WHERE m.user_id = ? ORDER BY b.created_at`,
+    )
+    .all(userId) as Record<string, unknown>[];
+  const plan = { remove: [] as Business[], leave: [] as Business[] };
+  for (const r of rows) (r.shared ? plan.leave : plan.remove).push(toBusiness(r)!);
+  return plan;
+}
+
+/** Removes the user, their memberships, sessions and unused email links. Businesses are handled by the caller. */
+export function deleteUser(userId: string) {
+  const d = adb();
+  d.prepare('DELETE FROM sessions WHERE user_id = ?').run(userId);
+  d.prepare('DELETE FROM login_tokens WHERE user_id = ?').run(userId);
+  d.prepare('DELETE FROM memberships WHERE user_id = ?').run(userId);
+  d.prepare('DELETE FROM users WHERE id = ?').run(userId);
 }
 
 // ---------------------------------------------------------------- payment links

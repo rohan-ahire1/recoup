@@ -1,4 +1,4 @@
-import { deleteBusinessAction, signOutAction } from '@/app/account-actions';
+import { deleteAccountAction, deleteBusinessAction, requestEmailChangeAction, signOutAction, signOutEverywhereAction } from '@/app/account-actions';
 import {
   addEmailDomainAction,
   checkEmailDomainAction,
@@ -11,7 +11,7 @@ import {
 import { SubmitButton } from '@/app/components/SubmitButton';
 import { buttonClass, Chip, FIELD, PageTitle, Panel, PremiumBadge } from '@/app/components/ui';
 import { aiEnabled, aiUsage } from '@/lib/ai';
-import { getEmailDomain, getQuickBooks, getUser } from '@/lib/accounts';
+import { accountDeletionPlan, getEmailDomain, getQuickBooks, getUser } from '@/lib/accounts';
 import { dailyCap, dailyLimit, senderFor } from '@/lib/email';
 import { formatDate, relativeTime } from '@/lib/format';
 import { quickBooksConfigured } from '@/lib/quickbooks';
@@ -46,17 +46,30 @@ function Connection({ id, name, detail, status }: { id?: string; name: string; d
   );
 }
 
+const ACCOUNT_NOTICES: Record<string, { tone: 'teal' | 'rust'; text: string }> = {
+  'email-changed': { tone: 'teal', text: 'Your sign-in email is changed.' },
+  'email-invalid': { tone: 'rust', text: 'That doesn’t look like an email address.' },
+  'email-same': { tone: 'rust', text: 'That’s already your sign-in email.' },
+  'email-taken': { tone: 'rust', text: 'Another account already uses that email.' },
+  'email-slow': { tone: 'rust', text: 'Too many tries. Please wait a while and try again.' },
+  'email-send': { tone: 'rust', text: 'We couldn’t send the email just now. Please try again in a minute.' },
+  'email-expired': { tone: 'rust', text: 'That link has expired, was already used, or belongs to a different account. Ask for a new one.' },
+  'delete-confirm': { tone: 'rust', text: 'Type your account email exactly to confirm.' },
+};
+
 const connected = <span className="rounded-full bg-teal-soft px-3 py-1 text-sm font-semibold text-teal-strong">Connected</span>;
 
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; error?: string; domainError?: string; checked?: string; qb?: string }>;
+  searchParams: Promise<{ saved?: string; error?: string; domainError?: string; checked?: string; qb?: string; account?: string; to?: string; dev?: string }>;
 }) {
   const { business } = enterBusiness(await requireBusiness());
   const session = await requireSession();
   const user = session.userId ? getUser(session.userId) : undefined;
-  const { saved, error, domainError, checked, qb } = await searchParams;
+  const { saved, error, domainError, checked, qb, account, to, dev } = await searchParams;
+  const plan = user ? accountDeletionPlan(user.id) : undefined;
+  const accountNotice = account ? ACCOUNT_NOTICES[account] : undefined;
   const s = getSettings();
   const p = providerStatus();
   const canAuto = p.email !== 'mock';
@@ -316,6 +329,64 @@ export default async function SettingsPage({
           </form>
         )}
       </Panel>
+
+      {user && plan && (
+        <Panel id="account" className="mt-8 flex scroll-mt-24 flex-col gap-5 p-6 text-sm sm:p-7">
+          <div>
+            <h2 className="display text-section font-bold">Your account</h2>
+            <p className="text-muted">Signed in as <span className="font-semibold text-ink break-all">{user.email}</span>.</p>
+            {accountNotice && <p className={`mt-2 font-semibold ${accountNotice.tone === 'teal' ? 'text-teal' : 'text-rust'}`}>{accountNotice.text}</p>}
+          </div>
+
+          <form action={requestEmailChangeAction} className="flex flex-col gap-3 border-t border-linen pt-5">
+            <span className="font-semibold">Change sign-in email</span>
+            <span className="text-muted">We’ll send a link to the new address. Your email changes only after you open it and press the button there.</span>
+            {account === 'email-sent' && (
+              <span className="font-semibold text-teal">
+                Check {to ?? 'the new address'} for the link. It works once and expires in 15 minutes.
+                {dev && <> Email isn’t set up on this server, so here’s the link: <a className="underline break-all" href={dev}>confirm</a></>}
+              </span>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <input name="newEmail" type="email" required autoComplete="email" placeholder="new@yourbusiness.com" aria-label="New sign-in email" className={`h-11 max-w-xs ${FIELD}`} />
+              <SubmitButton variant="outline" pendingLabel="Sending…">Send confirmation link</SubmitButton>
+            </div>
+          </form>
+
+          <form action={signOutEverywhereAction} className="flex flex-wrap items-center justify-between gap-3 border-t border-linen pt-5">
+            <span className="min-w-0">
+              <span className="block font-semibold">Sign out everywhere</span>
+              <span className="text-muted">Ends every session on every device, including this one. You’ll need a new sign-in link.</span>
+            </span>
+            <SubmitButton variant="outline" pendingLabel="Signing out…" confirm="Sign out of every device, including this one?">Sign out everywhere</SubmitButton>
+          </form>
+
+          <form action={deleteAccountAction} className="flex flex-col gap-3 border-t border-linen pt-5">
+            <span className="font-semibold">Delete my account</span>
+            <div className="text-muted">
+              <p>Deleting your account removes, for good:</p>
+              <ul className="mt-1 list-disc pl-5">
+                <li>Your sign-in ({user.email}) and every session on every device.</li>
+                {plan.remove.map((b) => (
+                  <li key={b.id}>
+                    <span className="font-semibold text-ink">{b.name}</span>: every customer, invoice, message and setting, its own sending domain, and its QuickBooks connection. You’re its only owner.
+                  </li>
+                ))}
+              </ul>
+              {plan.leave.length > 0 && (
+                <p className="mt-2">
+                  Not deleted, because someone else also owns {plan.leave.length === 1 ? 'it' : 'them'}: {plan.leave.map((b) => b.name).join(', ')}. You’re just removed from {plan.leave.length === 1 ? 'it' : 'them'}.
+                </p>
+              )}
+              <p className="mt-2">Download your invoices first if you need them. This can’t be undone.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <input name="confirm" placeholder={`Type “${user.email}” to confirm`} aria-label="Account email to confirm" autoComplete="off" className={`h-11 max-w-xs ${FIELD}`} />
+              <SubmitButton variant="danger" pendingLabel="Deleting…" confirm="Delete your account and the data listed above? This can’t be undone.">Delete my account</SubmitButton>
+            </div>
+          </form>
+        </Panel>
+      )}
     </div>
   );
 }
