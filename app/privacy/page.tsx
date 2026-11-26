@@ -16,6 +16,9 @@ export default function PrivacyPage() {
         <li>What Recoup does: the reminders it prepares and sends, replies you log, and whether emails bounced or were marked as spam.</li>
       </ul>
 
+      <h2>Taking your data with you</h2>
+      <p>You can download everything in your business as one JSON file at any time with “Download all your data” in Settings: your customers, invoices, messages, payments and settings. Payment-page links and encrypted tokens are left out.</p>
+
       <h2>Why</h2>
       <p>Only to run Recoup for you: to send reminders in your name, show you who owes what, and stop when they pay. We don’t sell data, show ads, or use your customers’ details for anything else.</p>
 
