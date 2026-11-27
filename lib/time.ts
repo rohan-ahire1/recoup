@@ -6,6 +6,10 @@ export const DAY = 24 * HOUR;
 export const SMS_WINDOW_START_HOUR = 8;
 export const SMS_WINDOW_END_HOUR = 21;
 
+/** Automatic emails only go out Monday to Friday, 8:00 to 17:59 in the business's timezone. */
+export const EMAIL_WINDOW_START_HOUR = 8;
+export const EMAIL_WINDOW_END_HOUR = 18;
+
 const formatters = new Map<string, Intl.DateTimeFormat>();
 
 function formatter(timeZone: string) {
@@ -64,6 +68,35 @@ export function nextSmsWindow(ms: number, timeZone: string): number {
   let t = Math.ceil(ms / step) * step;
   for (let i = 0; i < 4 * 48; i++, t += step) {
     if (isSmsAllowed(t, timeZone)) return t;
+  }
+  return ms;
+}
+
+const weekdayFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function isWeekday(ms: number, timeZone: string): boolean {
+  let f = weekdayFormatters.get(timeZone);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' });
+    weekdayFormatters.set(timeZone, f);
+  }
+  const day = f.format(new Date(ms));
+  return day !== 'Sat' && day !== 'Sun';
+}
+
+export function isEmailAllowed(ms: number, timeZone: string): boolean {
+  if (!isWeekday(ms, timeZone)) return false;
+  const { hour } = localParts(ms, timeZone);
+  return hour >= EMAIL_WINDOW_START_HOUR && hour < EMAIL_WINDOW_END_HOUR;
+}
+
+/** The earliest instant at or after `ms` when an automatic email may be sent. */
+export function nextEmailWindow(ms: number, timeZone: string): number {
+  if (isEmailAllowed(ms, timeZone)) return ms;
+  const step = 15 * MINUTE;
+  let t = Math.ceil(ms / step) * step;
+  for (let i = 0; i < 4 * 96; i++, t += step) {
+    if (isEmailAllowed(t, timeZone)) return t;
   }
   return ms;
 }
