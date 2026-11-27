@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { gmailLink, mailtoLink, outlookLink, smsLink } from '../lib/compose';
-import { normalizePhone, parseAmount, parseDue, parseInvoiceCsv } from '../lib/csv';
+import { normalizePhone, parseAmount, parseDate, parseDue, parseInvoiceCsv } from '../lib/csv';
 import { summarize, trackRecord } from '../lib/history';
 import { renderTemplate, templateVars } from '../lib/templates';
 import { BUILTIN_TONES } from '../lib/tones';
@@ -44,6 +44,40 @@ describe('CSV import', () => {
     expect(parseAmount('0')).toBeNull();
     expect(parseDue('8/1/26', '2026-09-26')).toBe('2026-08-01');
     expect(parseDue('2/30/2026', '2026-09-26')).toBeNull();
+  });
+
+  it('reads Excel and accounting-export date formats', () => {
+    for (const s of [
+      '2026-08-25 00:00:00', '2026-08-25T00:00:00Z', '8/25/2026 0:00', '8/25/2026 12:00 AM', '8/25/2026 12:00 am',
+      'Aug 25, 2026', 'August 25 2026', 'aug 25, 2026', 'AUGUST 25, 2026', '25 Aug 2026', '25-Aug-2026', '25-Aug-26', '25 august 2026',
+    ]) expect(parseDate(s), s).toBe('2026-08-25');
+    expect(parseDue('Aug 25, 2026', '2026-09-26')).toBe('2026-08-25');
+    expect(parseDue('32d', '2026-09-26')).toBe('2026-08-25');
+    expect(parseDate('2026-02-30 00:00')).toBeNull();
+    expect(parseDate('Feb 30, 2026')).toBeNull();
+    expect(parseDate('25/08/2026')).toBeNull();
+  });
+
+  it('reads USD-labelled amounts and rejects other currencies', () => {
+    expect(parseAmount('$1,200.00 USD')).toBe(120000);
+    expect(parseAmount('1200 USD')).toBe(120000);
+    expect(parseAmount(' usd 1,200 ')).toBe(120000);
+    expect(parseAmount('€50')).toBeNull();
+    expect(parseAmount('50 EUR')).toBeNull();
+    expect(parseAmount('-20')).toBeNull();
+    expect(parseAmount('10.999')).toBeNull();
+  });
+
+  it('imports a whole CSV that uses month-name dates', () => {
+    const text = [
+      'Customer,Email,Invoice,Amount,Due,Paid',
+      'A,a@x.co,#1,"$1,200.00 USD","Aug 25, 2026",',
+      'B,b@x.co,#2,300 USD,25-Aug-2026,"Sep 1, 2026"',
+    ].join('\n');
+    const { rows } = parseInvoiceCsv(text, opts);
+    expect(rows.map((r) => r.errors)).toEqual([[], []]);
+    expect(rows[0].invoice).toMatchObject({ amountCents: 120000, dueDate: '2026-08-25' });
+    expect(rows[1].invoice).toMatchObject({ amountCents: 30000, dueDate: '2026-08-25', paidDate: '2026-09-01' });
   });
 });
 
