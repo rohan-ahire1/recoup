@@ -32,6 +32,11 @@ async function resend<T>(path: string, init: { method?: string; body?: unknown }
   }
 }
 
+/** The domain customer replies are received on (MX pointed at Resend). Unset means reply logging is off. */
+export function inboundReplyDomain(): string | null {
+  return process.env.INBOUND_REPLY_DOMAIN?.trim().toLowerCase() || null;
+}
+
 export async function sendEmail(opts: { to: string; subject: string; text: string; from: string; replyTo?: string }): Promise<SendResult> {
   if (!resendConfigured()) {
     return { provider: 'mock', providerId: `mock_${randomBytes(6).toString('hex')}`, status: 'delivered' };
@@ -43,6 +48,21 @@ export async function sendEmail(opts: { to: string; subject: string; text: strin
   if (!r.ok) return { provider: 'resend', providerId: null, status: 'failed', error: r.error };
   return { provider: 'resend', providerId: r.data.id ?? null, status: 'sent' };
 }
+
+// ---------------------------------------------------------------- received email
+
+export interface ReceivedEmail {
+  from: string;
+  to: string[];
+  subject: string;
+  text: string | null;
+  html: string | null;
+  /** Header names are lowercase. */
+  headers: Record<string, string>;
+}
+
+/** The body and headers of an email Resend received. The webhook only carries metadata. */
+export const getReceivedEmail = (id: string) => resend<ReceivedEmail>(`/emails/receiving/${encodeURIComponent(id)}`);
 
 // ---------------------------------------------------------------- a business's own domain
 

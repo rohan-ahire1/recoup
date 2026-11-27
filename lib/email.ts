@@ -10,7 +10,7 @@ import {
   type EmailDomain,
 } from './accounts';
 import { get, run } from './db';
-import { mailbox, resendConfigured, sendEmail, createDomain, deleteDomain, getDomain, verifyDomain, type SendResult } from './providers/email';
+import { inboundReplyDomain, mailbox, resendConfigured, sendEmail, createDomain, deleteDomain, getDomain, verifyDomain, type SendResult } from './providers/email';
 import { logEvent, setCaseStatus, updateCase } from './repo';
 import type { Settings } from './settings';
 import { currentTenant, runAsBusiness } from './tenant';
@@ -79,10 +79,14 @@ export function footer(settings: Settings): string {
 }
 
 /** Send one reminder email for the current business. */
-export async function sendBusinessEmail(msg: { to: string; subject: string; text: string }, settings: Settings): Promise<SendResult> {
+export async function sendBusinessEmail(msg: { to: string; subject: string; text: string; payToken?: string }, settings: Settings): Promise<SendResult> {
   const { businessId } = currentTenant();
+  const { payToken, ...mail } = msg;
   const sender = senderFor(businessId, settings);
-  const result = await sendEmail({ ...msg, text: msg.text + '\n' + footer(settings), ...sender });
+  // With an inbound domain set, replies come to Recoup first so they can be logged, then are forwarded to the business.
+  const inbound = inboundReplyDomain();
+  if (inbound && payToken) sender.replyTo = `reply+${payToken}@${inbound}`;
+  const result = await sendEmail({ ...mail, text: msg.text + '\n' + footer(settings), ...sender });
   if (result.status !== 'failed' && result.providerId && result.provider === 'resend') recordSentEmail(result.providerId, businessId);
   return result;
 }
