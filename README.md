@@ -87,6 +87,7 @@ Everything is optional in development. Copy `.env.example` to `.env` and fill in
 | Public URL for links and sign-in emails | `PUBLIC_BASE_URL` |
 | Scheduler (`POST /api/cron/run` every 15 minutes) | `CRON_SECRET` |
 | Email via Resend | `RESEND_API_KEY`, `EMAIL_FROM`, `AUTH_EMAIL_FROM`, `RESEND_WEBHOOK_SECRET`, `EMAIL_DAILY_CAP` (default 200), `NEW_ACCOUNT_DAILY_CAP` (default 20 a day for accounts younger than `NEW_ACCOUNT_DAYS`, default 14, until they verify their own domain) |
+| Log customer replies from email | `INBOUND_REPLY_DOMAIN` (unset means off). See below |
 | QuickBooks Online | `QUICKBOOKS_CLIENT_ID`, `QUICKBOOKS_CLIENT_SECRET`, `QUICKBOOKS_ENVIRONMENT`, `TOKEN_ENCRYPTION_KEY` |
 | AI features | `ANTHROPIC_API_KEY`, `TYPESAFE_API_KEY` (optional, Jev sorts replies), `AI_MONTHLY_CAP` (AI calls per business per month, default 300) |
 | Error alerts (ntfy) | `NTFY_URL` |
@@ -95,6 +96,10 @@ Everything is optional in development. Copy `.env.example` to `.env` and fill in
 | Most demo workspaces alive at once | `MAX_LIVE_DEMOS` (default 300) |
 
 Without email keys, sign-in links are printed to the server log.
+
+### Logging replies from email
+
+Set `INBOUND_REPLY_DOMAIN` (for example `reply.yourdomain.com`) and reminders go out with `Reply-To: reply+<customer token>@<that domain>`. Add the MX records Resend shows for receiving on that domain, and subscribe the existing webhook (`/api/webhooks/resend`) to `email.received`. Each reply is then logged against the customer like a hand-logged one, with quoted history cut, and forwarded to the business's reply-to address with the customer in `Reply-To`. Automatic replies (out of office, `Auto-Submitted`) and mail to unknown tokens are ignored. Leave it unset and reminders keep replying straight to the business.
 
 ## Import format
 
@@ -147,7 +152,7 @@ tests/             Engine, import, history, tenants, email, webhooks, QuickBooks
 
 ## Known gaps
 
-- Replies are logged by hand; Gmail/Outlook mailbox sync isn't built.
+- Replies are logged by hand unless `INBOUND_REPLY_DOMAIN` is set. That only catches replies to Recoup's own reminders; Gmail/Outlook mailbox sync isn't built, so replies to messages sent from your own inbox are still logged by hand.
 - Missed plan installments aren't chased yet.
 - QuickBooks is the only accounting integration.
 - One server with SQLite; running several servers would need Postgres.

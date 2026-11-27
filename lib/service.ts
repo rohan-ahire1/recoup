@@ -318,9 +318,9 @@ function autoSends(channel: Channel, settings: Settings): boolean {
   return settings.deliveryMode === 'auto' && providerFor(channel);
 }
 
-async function deliver(message: { channel: Channel; toAddr: string | null; subject: string | null; body: string }, settings: Settings): Promise<SendResult> {
+async function deliver(message: { channel: Channel; toAddr: string | null; subject: string | null; body: string }, settings: Settings, payToken?: string): Promise<SendResult> {
   if (message.channel === 'sms') throw new Error('Texts are sent from the business’s own phone');
-  return sendBusinessEmail({ to: message.toAddr!, subject: message.subject ?? `Message from ${settings.businessName}`, text: message.body }, settings);
+  return sendBusinessEmail({ to: message.toAddr!, subject: message.subject ?? `Message from ${settings.businessName}`, text: message.body, payToken }, settings);
 }
 
 function stepLabel(m: Pick<Message, 'step' | 'actionKey'>): string {
@@ -391,7 +391,7 @@ async function prepare(customer: Customer, c: Case, action: Action, now: number)
     logEvent(customer.id, c.id, 'prepared', `${label} ready to send by ${via}${blocked ? `. ${blocked} It waits for you.` : ''}`, now);
     return 'prepared' as const;
   }
-  const result = await deliver({ channel: action.channel, toAddr: to, subject, body }, settings);
+  const result = await deliver({ channel: action.channel, toAddr: to, subject, body }, settings, customer.payToken);
   if (result.status === 'failed') {
     updateMessage(claim.id, { status: 'failed', provider: result.provider, error: result.error ?? 'Unknown error' });
     logEvent(customer.id, c.id, 'send_failed', `${label} by ${via} failed: ${result.error}`, now);
@@ -534,7 +534,7 @@ export async function sendDraftNow(messageId: number, now = getNow()) {
   if (!providerFor(channel)) throw new Error(`No ${channel === 'email' ? 'email' : 'texting'} service is connected`);
   const blocked = sendingBlocked(currentTenant().businessId);
   if (blocked) throw new Error(blocked);
-  const result = await deliver({ ...m, channel }, getSettings());
+  const result = await deliver({ ...m, channel }, getSettings(), getCustomer(m.customerId)?.payToken);
   if (result.status === 'failed') {
     updateMessage(m.id, { error: result.error ?? 'Unknown error' });
     throw new Error(result.error ?? 'Sending failed');
