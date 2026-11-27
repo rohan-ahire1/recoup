@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { allocatePayment, carrierKeyword, pickChannel, planActions, splitInstallments, type EngineInput } from '../lib/sequence';
-import { DAY, HOUR, localParts } from '../lib/time';
+import { DAY, HOUR, isEmailAllowed, localParts, nextEmailWindow } from '../lib/time';
 
 const TZ = 'America/Chicago';
 const START = Date.parse('2026-09-01T15:00:00Z'); // 10:00 in Chicago
@@ -19,6 +19,7 @@ function input(o: Partial<EngineInput> & { now: number }): EngineInput {
     installments: [],
     timeZone: TZ,
     autoSms: false,
+    autoEmail: false,
     ...o,
   };
 }
@@ -105,6 +106,50 @@ describe('sequence', () => {
     expect(auto.actions).toEqual([]);
     const p = localParts(auto.next!.at, TZ);
     expect([p.hour, p.minute]).toEqual([8, 0]);
+  });
+
+  it('holds automatic emails until a weekday working hour', () => {
+    const saturday = Date.parse('2026-09-05T15:00:00Z'); // Sat 10:00 in Chicago
+    const off = planActions(input({ now: saturday, startedAt: saturday, autoEmail: false }));
+    expect(off.actions).toHaveLength(1);
+    const weekend = planActions(input({ now: saturday, startedAt: saturday, autoEmail: true }));
+    expect(weekend.actions).toEqual([]);
+    expect(localParts(weekend.next!.at, TZ)).toMatchObject({ month: 9, day: 7, hour: 8, minute: 0 });
+
+    const night = Date.parse('2026-09-08T08:00:00Z'); // Tue 03:00 in Chicago
+    const early = planActions(input({ now: night, startedAt: night, autoEmail: true }));
+    expect(early.actions).toEqual([]);
+    expect(localParts(early.next!.at, TZ)).toMatchObject({ month: 9, day: 8, hour: 8, minute: 0 });
+
+    const open = early.next!.at;
+    expect(planActions(input({ now: open, startedAt: night, autoEmail: true })).actions).toHaveLength(1);
+  });
+});
+
+describe('email window', () => {
+  it('allows Monday to Friday, 8:00 to 17:59 local', () => {
+    expect(isEmailAllowed(Date.parse('2026-09-08T13:00:00Z'), TZ)).toBe(true); // Tue 08:00
+    expect(isEmailAllowed(Date.parse('2026-09-08T12:59:00Z'), TZ)).toBe(false); // Tue 07:59
+    expect(isEmailAllowed(Date.parse('2026-09-08T22:59:00Z'), TZ)).toBe(true); // Tue 17:59
+    expect(isEmailAllowed(Date.parse('2026-09-08T23:00:00Z'), TZ)).toBe(false); // Tue 18:00
+    expect(isEmailAllowed(Date.parse('2026-09-06T17:00:00Z'), TZ)).toBe(false); // Sun 12:00
+  });
+
+  it('uses the business timezone for the weekday, not the server', () => {
+    const t = Date.parse('2026-09-07T02:00:00Z'); // Sun 21:00 Chicago, Mon 07:30 in Kolkata
+    expect(isEmailAllowed(t, TZ)).toBe(false);
+    expect(isEmailAllowed(t + 2 * HOUR, 'Asia/Kolkata')).toBe(true); // Mon 09:30
+  });
+
+  it('finds the next window across the 2026-11-01 DST change in Chicago', () => {
+    const sat = Date.parse('2026-10-31T15:00:00Z'); // Sat 10:00 CDT
+    const next = nextEmailWindow(sat, TZ);
+    expect(next).toBe(Date.parse('2026-11-02T14:00:00Z')); // Mon 08:00 CST (UTC-6)
+    expect(localParts(next, TZ)).toMatchObject({ day: 2, hour: 8, minute: 0 });
+    expect(isEmailAllowed(Date.parse('2026-10-30T22:59:00Z'), TZ)).toBe(true); // Fri 17:59 CDT
+    expect(isEmailAllowed(Date.parse('2026-10-30T23:00:00Z'), TZ)).toBe(false); // Fri 18:00 CDT
+    expect(nextEmailWindow(next, TZ)).toBe(next);
+    expect(nextEmailWindow(Date.parse('2026-11-02T13:59:00Z'), TZ)).toBe(next); // 07:59 CST
   });
 });
 
