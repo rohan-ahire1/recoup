@@ -175,3 +175,117 @@ describe('webhook signatures', () => {
     expect(verifySvix(secret, { id: null, timestamp: ts, signature: sign('msg_1', ts, body) }, body, now)).toBe(false);
   });
 });
+
+describe('customer replies by email', () => {
+  const sendBodies: Record<string, unknown>[] = [];
+  let received: { text?: string | null; html?: string | null; subject?: string; headers?: Record<string, string>; from?: string } = {};
+  let fetches: string[] = [];
+  let failReceive = false;
+
+  beforeEach(() => {
+    process.env.INBOUND_REPLY_DOMAIN = 'reply.recoup.test';
+    sendBodies.length = 0;
+    fetches = [];
+    failReceive = false;
+    received = {};
+    vi.stubGlobal('fetch', async (url: string, init: { body?: string }) => {
+      fetches.push(url);
+      if (url.includes('/emails/receiving/')) {
+        if (failReceive) return new Response(JSON.stringify({ message: 'nope' }), { status: 500 });
+        return new Response(
+          JSON.stringify({ from: 'Dana Ruiz <dana@x.co>', to: [], subject: 'Re: Invoice #1', text: null, html: null, headers: {}, ...received }),
+          { status: 200 },
+        );
+      }
+      sendBodies.push(JSON.parse(init.body!));
+      return new Response(JSON.stringify({ id: `em_${++nextId}` }), { status: 200 });
+    });
+  });
+  afterEach(() => {
+    delete process.env.INBOUND_REPLY_DOMAIN;
+  });
+
+  async function setup(name: string, mode: 'auto' | 'prepare' = 'prepare') {
+    const b = a.createBusiness({ name });
+    const customer = await runAsBusiness(a.tenantOf(b), async () => {
+      saveSettings({ businessName: name, replyToEmail: 'owner@harbor.test', mailingAddress: '1 Pier Rd, Portland, ME', deliveryMode: mode });
+      await svc.importCsv('Customer,Email,Invoice,Amount,Due\nDana,dana@x.co,#1,100,2026-01-01');
+      return repo.listCustomers()[0];
+    });
+    return { b, customer };
+  }
+
+  const event = (token: string, id = `rx_${++nextId}`) => ({ email_id: id, from: 'dana@x.co', to: [`reply+${token}@reply.recoup.test`], subject: 'Re: Invoice #1' });
+
+  it('sets Reply-To to the customer’s inbound address only when the domain is set', async () => {
+    const { customer } = await setup('Reply-To Co', 'auto');
+    expect(sendBodies[0]).toMatchObject({ reply_to: `reply+${customer.payToken}@reply.recoup.test` });
+    delete process.env.INBOUND_REPLY_DOMAIN;
+    sendBodies.length = 0;
+    await setup('Plain Reply-To Co', 'auto');
+    expect(sendBodies[0]).toMatchObject({ reply_to: 'owner@harbor.test' });
+  });
+
+  it('logs a reply against the right customer and business, and forwards it', async () => {
+    const one = await setup('Harbor One');
+    const two = await setup('Harbor Two');
+    received = { text: 'I will pay on Friday.\n\nOn Mon, Jan 5, 2026 at 9:00 AM Harbor One <x@y.z> wrote:\n> Hi Dana, your invoice is due.' };
+    const { handleReceivedEmail } = await import('../lib/inbound');
+    expect(await handleReceivedEmail(event(one.customer.payToken))).toBe('logged');
+
+    runAsBusiness(a.tenantOf(one.b), () => {
+      const inbound = repo.listCustomerMessages(one.customer.id).filter((m) => m.direction === 'inbound');
+      expect(inbound).toHaveLength(1);
+      expect(inbound[0]).toMatchObject({ channel: 'email', body: 'I will pay on Friday.', status: 'received' });
+    });
+    runAsBusiness(a.tenantOf(two.b), () => {
+      expect(repo.listCustomerMessages(two.customer.id).filter((m) => m.direction === 'inbound')).toHaveLength(0);
+    });
+    const fwd = sendBodies.at(-1)!;
+    expect(fwd).toMatchObject({ to: ['owner@harbor.test'], reply_to: 'dana@x.co' });
+    expect(String(fwd.text)).toContain('I will pay on Friday.');
+  });
+
+  it('logs a retried webhook once', async () => {
+    const { b, customer } = await setup('Retry Co');
+    received = { text: 'Paid last week.' };
+    const { handleReceivedEmail } = await import('../lib/inbound');
+    const ev = event(customer.payToken);
+    expect(await handleReceivedEmail(ev)).toBe('logged');
+    expect(await handleReceivedEmail(ev)).toBe('duplicate');
+    runAsBusiness(a.tenantOf(b), () => expect(repo.listCustomerMessages(customer.id).filter((m) => m.direction === 'inbound')).toHaveLength(1));
+  });
+
+  it('ignores unknown tokens, other domains and auto-replies without fetching or logging', async () => {
+    const { b, customer } = await setup('Ignore Co');
+    const { handleReceivedEmail } = await import('../lib/inbound');
+    received = { text: 'Hello' };
+    expect(await handleReceivedEmail(event('nosuchtoken1234567890'))).toBe('ignored');
+    expect(await handleReceivedEmail({ ...event(customer.payToken), to: [`reply+${customer.payToken}@elsewhere.test`] })).toBe('ignored');
+    expect(fetches.filter((u) => u.includes('/receiving/'))).toHaveLength(0);
+
+    received = { text: 'I am away', headers: { 'Auto-Submitted': 'auto-replied' } };
+    expect(await handleReceivedEmail(event(customer.payToken))).toBe('ignored');
+    received = { text: 'I am away', subject: 'Out of Office: Invoice #1' };
+    expect(await handleReceivedEmail(event(customer.payToken))).toBe('ignored');
+    received = { text: 'Real reply', headers: { 'Auto-Submitted': 'no' } };
+    expect(await handleReceivedEmail(event(customer.payToken))).toBe('logged');
+    runAsBusiness(a.tenantOf(b), () => expect(repo.listCustomerMessages(customer.id).filter((m) => m.direction === 'inbound')).toHaveLength(1));
+  });
+
+  it('does nothing when INBOUND_REPLY_DOMAIN is unset, and asks Resend to retry when the body can’t be fetched', async () => {
+    const { customer } = await setup('Off Co');
+    const { handleReceivedEmail } = await import('../lib/inbound');
+    failReceive = true;
+    expect(await handleReceivedEmail(event(customer.payToken))).toBe('retry');
+    delete process.env.INBOUND_REPLY_DOMAIN;
+    expect(await handleReceivedEmail(event(customer.payToken))).toBe('ignored');
+  });
+
+  it('strips quoted history', async () => {
+    const { stripQuoted } = await import('../lib/inbound');
+    expect(stripQuoted('Thanks!\n\nOn Mon, 5 Jan 2026 at 09:00, Dana <d@x.co>\nwrote:\n> hi')).toBe('Thanks!');
+    expect(stripQuoted('Yes\nSecond line\n> old\n> older')).toBe('Yes\nSecond line');
+    expect(stripQuoted('On Friday I can pay.\nThanks')).toBe('On Friday I can pay.\nThanks');
+  });
+});
