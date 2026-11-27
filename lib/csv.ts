@@ -70,8 +70,9 @@ export function normalizeEmail(input: string): string | null {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? s : null;
 }
 
+/** "$1,200.00", "1200", "$1,200.00 USD" or "USD 1200". Other currencies are rejected. */
 export function parseAmount(input: string): number | null {
-  const s = input.replace(/[$,\s]/g, '');
+  const s = input.trim().replace(/^USD\s*/i, '').replace(/\s*USD$/i, '').replace(/[$,\s]/g, '');
   if (!/^\d+(\.\d{1,2})?$/.test(s)) return null;
   const cents = Math.round(parseFloat(s) * 100);
   return cents > 0 ? cents : null;
@@ -83,13 +84,33 @@ function validDate(y: number, m: number, d: number): string | null {
   return dt.toISOString().slice(0, 10);
 }
 
-/** "2026-08-25" or "8/25/2026". */
+const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const MONTH_NAMES = 'january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept|sep|oct|nov|dec';
+// A trailing time after a numeric date: "00:00:00", "T00:00:00Z", "0:00", "12:00 AM", "10:30:00.000+02:00".
+const TIME_SUFFIX = /(?:[T\s]\s*\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:[ap]\.?m\.?)?\s*(?:Z|[+-]\d{2}:?\d{2})?)?$/i;
+
+function monthNumber(name: string): number {
+  return MONTHS.indexOf(name.slice(0, 3).toLowerCase()) + 1;
+}
+
+function fullYear(y: string): number {
+  return y.length === 2 ? 2000 + Number(y) : Number(y);
+}
+
+/**
+ * "2026-08-25", "8/25/2026", either with a trailing time ("2026-08-25 00:00:00", "8/25/2026 12:00 AM"),
+ * or an English month name ("Aug 25, 2026", "25 August 2026", "25-Aug-26"). Day-first numeric dates are not guessed.
+ */
 export function parseDate(input: string): string | null {
   const s = input.trim();
-  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  let m = s.match(new RegExp(`^(\\d{4})-(\\d{1,2})-(\\d{1,2})${TIME_SUFFIX.source}`, 'i'));
   if (m) return validDate(Number(m[1]), Number(m[2]), Number(m[3]));
-  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
-  if (m) return validDate(m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]), Number(m[1]), Number(m[2]));
+  m = s.match(new RegExp(`^(\\d{1,2})/(\\d{1,2})/(\\d{2}|\\d{4})${TIME_SUFFIX.source}`, 'i'));
+  if (m) return validDate(fullYear(m[3]), Number(m[1]), Number(m[2]));
+  m = s.match(new RegExp(`^(${MONTH_NAMES})\\.?[\\s-]+(\\d{1,2})(?:st|nd|rd|th)?(?:,\\s*|[\\s-]+)(\\d{2}|\\d{4})$`, 'i'));
+  if (m) return validDate(fullYear(m[3]), monthNumber(m[1]), Number(m[2]));
+  m = s.match(new RegExp(`^(\\d{1,2})(?:st|nd|rd|th)?[\\s-]+(${MONTH_NAMES})\\.?(?:,\\s*|[\\s-]+)(\\d{2}|\\d{4})$`, 'i'));
+  if (m) return validDate(fullYear(m[3]), monthNumber(m[2]), Number(m[1]));
   return null;
 }
 
