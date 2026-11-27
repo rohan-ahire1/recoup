@@ -172,7 +172,7 @@ export default async function SettingsPage({
           )}
           {[
             { v: 'prepare', title: 'I’ll send them myself', detail: 'Recoup drafts each reminder. You open it in Gmail, Outlook, your mail app or your phone, and press send.' },
-            { v: 'auto', title: 'Send automatically', detail: canAuto ? `Emails go out on their own, up to ${limit.cap} a day. Texts still open on your phone for you to send.` : 'Email sending isn’t set up on this server yet.' },
+            { v: 'auto', title: 'Send automatically', detail: canAuto ? `Emails go out on their own on weekdays between 8am and 6pm, up to ${limit.cap} a day. Texts still open on your phone for you to send.` : 'Email sending isn’t set up on this server yet.' },
           ].map((o) => (
             <label key={o.v} className={`ease flex gap-3 rounded-block px-4 py-3.5 ring-1 ring-line ring-inset has-[:checked]:bg-teal-soft has-[:checked]:ring-2 has-[:checked]:ring-teal ${o.v === 'auto' && !canAuto ? 'opacity-60' : 'cursor-pointer'}`}>
               <input type="radio" name="deliveryMode" value={o.v} defaultChecked={s.deliveryMode === o.v} disabled={o.v === 'auto' && !canAuto} className="mt-1 accent-teal" />
