@@ -692,13 +692,22 @@ export function recordPayment(opts: {
     const customer = getCustomer(opts.customerId);
     if (!customer) throw new Error('Customer not found');
     const c = getOpenCase(customer.id);
+    const pool = openInvoices(customer.id).filter((i) => !opts.invoiceId || i.id === opts.invoiceId);
+    const parts = allocatePayment(opts.amountCents, pool.map((i) => ({ id: i.id, dueDate: i.dueDate, owedCents: owed(i) })));
+    const applied = parts.reduce((s, p) => s + p.cents, 0);
+    const via: Record<string, string> = { manual: 'recorded by you', demo: 'simulated', quickbooks: 'in QuickBooks' };
+    const how = via[opts.source] ?? opts.source;
+    if (applied <= 0) {
+      logEvent(customer.id, c?.id ?? null, 'payment', `Payment of ${money(opts.amountCents)} recorded, but nothing was owed.`, now);
+      return { duplicate: false, applied: 0 };
+    }
     const inserted = run(
       `INSERT OR IGNORE INTO payments (customer_id, case_id, installment_id, amount_cents, method, source, external_id, paid_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       customer.id,
       c?.id ?? null,
       opts.installmentId ?? null,
-      opts.amountCents,
+      applied,
       opts.method ?? null,
       opts.source,
       opts.externalId ?? null,
@@ -706,24 +715,22 @@ export function recordPayment(opts: {
     );
     if (inserted.changes === 0) return { duplicate: true }; // webhook retry
 
-    const pool = openInvoices(customer.id).filter((i) => !opts.invoiceId || i.id === opts.invoiceId);
     const t = today(now);
-    for (const part of allocatePayment(opts.amountCents, pool.map((i) => ({ id: i.id, dueDate: i.dueDate, owedCents: owed(i) })))) {
+    for (const part of parts) {
       const inv = pool.find((i) => i.id === part.id)!;
       const paid = inv.amountPaidCents + part.cents;
       updateInvoice(inv.id, { amount_paid_cents: paid, ...(paid >= inv.amountCents ? { status: 'paid', paid_date: t } : {}) }, now);
     }
     if (opts.installmentId) run('UPDATE installments SET paid_at = ? WHERE id = ?', now, opts.installmentId);
 
-    const via: Record<string, string> = { manual: 'recorded by you', demo: 'simulated', quickbooks: 'in QuickBooks' };
     const stillOverdue = c ? caseInvoices(customer.id, c.id).reduce((s, i) => s + owed(i), 0) : 0;
-    logEvent(customer.id, c?.id ?? null, 'payment', `Paid ${money(opts.amountCents)} ${via[opts.source] ?? opts.source}${stillOverdue ? `. ${money(stillOverdue)} still overdue.` : '. All caught up.'}`, now);
+    logEvent(customer.id, c?.id ?? null, 'payment', `Paid ${money(opts.amountCents)} ${how}${applied < opts.amountCents ? `. ${money(opts.amountCents - applied)} is more than was owed and isn't counted` : ''}${stillOverdue ? `. ${money(stillOverdue)} still overdue.` : '. All caught up.'}`, now);
     if (c && stillOverdue === 0) {
       setCaseStatus(c.id, 'resolved', now, { resolved_at: now, needs_attention: 0, attention_reason: null });
       const draft = readyMessageForCase(c.id);
       if (draft) updateMessage(draft.id, { status: 'skipped' });
     }
-    return { duplicate: false };
+    return { duplicate: false, applied };
   });
 }
 
