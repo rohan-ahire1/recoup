@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { registerPayToken } from './accounts';
 import { AiLimitError, aiEnabled, classifyReply, generateTemplateSet, personalizeMessage } from './ai';
-import { parseInvoiceCsv, type ParsedRow } from './csv';
+import { parseDate, parseInvoiceCsv, type ParsedRow } from './csv';
 import { all, get, run, tx } from './db';
 import { formatDateLong, money, plural } from './format';
 import { suggestedTone, summarize, trackRecord, type TrackRecord } from './history';
@@ -50,7 +50,7 @@ import {
 import { getClockOffset, getNow, getSettings, setClockOffset, type Settings } from './settings';
 import { firstName, renderTemplate, templateVars } from './templates';
 import { currentTenant } from './tenant';
-import { DAY, daysOverdue, localDate, monthKey, nextSmsWindow } from './time';
+import { DAY, daysBetween, daysOverdue, localDate, monthKey, nextSmsWindow } from './time';
 import type { TemplateSetContent } from './tones';
 import type { Case, CaseStatus, Channel, Customer, Invoice, Message, ReplyKind } from './types';
 
@@ -61,6 +61,15 @@ export function caseInvoices(customerId: number, caseId: number): Invoice[] {
   return openInvoices(customerId).filter((i) => i.caseId === caseId);
 }
 const today = (now: number) => localDate(now, getSettings().timezone);
+
+const MAX_PROMISE_DAYS = 180;
+
+/** A real calendar date, from today (business timezone) up to 180 days ahead. */
+export function validPromiseDate(date: string | null | undefined, now: number): date is string {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date) || parseDate(date) !== date) return false;
+  const ahead = daysBetween(today(now), date);
+  return ahead >= 0 && ahead <= MAX_PROMISE_DAYS;
+}
 const owed = (i: Invoice) => i.amountCents - i.amountPaidCents;
 
 // =================================================================== import
@@ -647,9 +656,16 @@ async function applyReply(customer: Customer, c: Case | undefined, kind: ReplyKi
 
   switch (kind) {
     case 'promise': {
-      const date = promiseDate && /^\d{4}-\d{2}-\d{2}$/.test(promiseDate) ? promiseDate : localDate(now + 7 * DAY, getSettings().timezone);
+      const usable = validPromiseDate(promiseDate, now);
+      const date = usable ? promiseDate : localDate(now + 7 * DAY, getSettings().timezone);
       setCaseStatus(c.id, 'promised', now, { promise_date: date, needs_attention: 0, attention_reason: null, paused_at: now });
-      logEvent(customer.id, c.id, 'promised', `Promised to pay by ${formatDateLong(date)}. Reminders wait until then.`, now);
+      logEvent(
+        customer.id,
+        c.id,
+        'promised',
+        usable ? `Promised to pay by ${formatDateLong(date)}. Reminders wait until then.` : 'No usable date given; holding reminders for a week.',
+        now,
+      );
       break;
     }
     case 'paid':
@@ -802,13 +818,16 @@ export function markHandled(customerId: number, now = getNow()) {
   if (c) updateCase(c.id, { needs_attention: 0, attention_reason: null }, now);
 }
 
-export function setPromise(customerId: number, date: string, now = getNow()) {
+/** Returns an error message when the date can't be used; the case is left unchanged. */
+export function setPromise(customerId: number, date: string, now = getNow()): string | null {
   const c = getOpenCase(customerId);
-  if (!c || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  if (!c) return null;
+  if (!validPromiseDate(date, now)) return `Pick a real date from today to ${MAX_PROMISE_DAYS} days ahead.`;
   const draft = readyMessageForCase(c.id);
   if (draft) updateMessage(draft.id, { status: 'skipped' });
   setCaseStatus(c.id, 'promised', now, { promise_date: date, needs_attention: 0, attention_reason: null, paused_at: now });
   logEvent(customerId, c.id, 'promised', `Promised to pay by ${formatDateLong(date)}. Reminders wait until then.`, now);
+  return null;
 }
 
 export function markInvoicePaid(invoiceId: number, now = getNow()) {

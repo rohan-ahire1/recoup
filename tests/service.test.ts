@@ -114,3 +114,43 @@ describe('payment page', () => {
     expect(svc.summarizeCustomer(repo.getCustomer(mika)!, day(11)).openCase).toBeUndefined();
   });
 });
+
+describe('promise dates', () => {
+  let pier: number;
+  const events = () => repo.listEvents(pier).map((e) => e.type);
+
+  beforeAll(async () => {
+    const rows = ['Customer,Contact,Email,Phone,Invoice,Description,Amount,Due,Paid', `Pier Nine Cafe,Sam Ortiz,sam@x.co,,#9,Repair,500,${date(15)},`].join('\n');
+    await svc.importCsv(rows, day(20));
+    pier = repo.findCustomer({ name: 'Pier Nine Cafe' })!.id;
+  });
+
+  it('rejects a past date and leaves the case alone', () => {
+    expect(svc.setPromise(pier, date(19), day(20))).toMatch(/real date/);
+    expect(svc.summarizeCustomer(repo.getCustomer(pier)!, day(20)).state).toBe('active');
+    expect(events()).not.toContain('promised');
+  });
+
+  it('rejects an impossible date and one too far ahead', () => {
+    expect(svc.setPromise(pier, '2026-02-31', day(20))).toMatch(/real date/);
+    expect(svc.setPromise(pier, date(20 + 181), day(20))).toMatch(/real date/);
+    expect(events()).not.toContain('promised');
+  });
+
+  it('accepts today', () => {
+    expect(svc.setPromise(pier, date(20), day(20))).toBeNull();
+    const s = svc.summarizeCustomer(repo.getCustomer(pier)!, day(20));
+    expect(s.state).toBe('promised');
+    expect(s.openCase?.promiseDate).toBe(date(20));
+  });
+
+  it('holds for a week when a logged reply promises a past date', async () => {
+    await svc.logReply({ customerId: pier, channel: 'email', body: 'I paid on the 3rd', kind: 'promise', promiseDate: date(3) }, day(21));
+    const s = svc.summarizeCustomer(repo.getCustomer(pier)!, day(21));
+    expect(s.openCase?.promiseDate).toBe(date(28));
+    expect(repo.listEvents(pier).at(-1)?.detail).toBe('No usable date given; holding reminders for a week.');
+    await svc.runDueActions(day(22));
+    expect(events()).not.toContain('promise_missed');
+    expect(svc.summarizeCustomer(repo.getCustomer(pier)!, day(22)).state).toBe('promised');
+  });
+});
